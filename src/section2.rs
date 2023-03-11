@@ -27,7 +27,10 @@ pub(super) fn read_section_2(
 ) -> Result<Section2, Box<dyn Error>> {
     if section_2_present {
         let section_size = read_3_octet_usize(&mut f)?;
-        let _reserved = read_1_octet_u8(&mut f)?;
+
+        // TODO: Check if this is zero and return an error if it isn't
+        let reserved = read_1_octet_u8(&mut f)?;
+        debug_assert_eq!(reserved, 0);
 
         let mut section_data = vec![];
         f.take(section_size as u64 - 4)

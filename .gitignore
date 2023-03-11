@@ -11,3 +11,7 @@ Cargo.lock
 
 # Editor files
 *.vim
+tags
+
+# Generated files
+src/table_*.rs

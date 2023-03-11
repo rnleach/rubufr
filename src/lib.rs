@@ -22,6 +22,9 @@ use section4::Section4;
 mod section5;
 use section5::Section5;
 
+mod table_b;
+mod table_d;
+
 pub struct BufrMessage {
     section_0: Section0,
     section_1: Section1,
@@ -37,7 +40,7 @@ pub fn read_bufr_message(mut f: impl Read) -> Result<BufrMessage, Box<dyn Error>
     let section_1 = section1::read_section_1(&mut f)?;
     let section_2 = section2::read_section_2(&mut f, section_1.section_2_exists())?;
     let section_3 = section3::read_section_3(&mut f)?;
-    let section_4 = section4::read_section_4(&mut f)?;
+    let section_4 = section4::read_section_4(&mut f, &section_3)?;
     let section_5 = section5::read_section_5(&mut f)?;
 
     Ok(BufrMessage {
