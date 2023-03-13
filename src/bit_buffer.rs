@@ -2,7 +2,14 @@ use std::{error::Error, io::Read};
 
 use crate::table_b;
 
-const BUF_SIZE: usize = (table_b::MAX_BIT_WIDTH / 8) + 1;
+// Use a buffer 8 times the size of the largest set of bits we need to read.
+// Notice we're going from bits to bytes here.
+const BUF_SIZE: usize = table_b::MAX_BIT_WIDTH;
+const BYTE_ARRAY_SIZE: usize = if table_b::MAX_BIT_WIDTH % 8 == 0 {
+    table_b::MAX_BIT_WIDTH / 8
+} else {
+    table_b::MAX_BIT_WIDTH / 8 + 1
+};
 
 pub(crate) struct BitBuffer<'b> {
     // The source
@@ -14,11 +21,11 @@ pub(crate) struct BitBuffer<'b> {
 
     // The buffer
     buffer: [u8; BUF_SIZE],
+    buffer_len: usize,
 
     // Track where we are in the buffer
     byte_position: usize,
     bit_position: usize,
-    buffer_len: usize,
 }
 
 impl<'b> BitBuffer<'b> {
@@ -36,6 +43,42 @@ impl<'b> BitBuffer<'b> {
 
     pub fn bytes_read(&self) -> usize {
         self.bytes_read
+    }
+
+    fn num_bytes_to_hold_bits(n: usize) -> usize {
+        if n % 8 == 0 {
+            n / 8
+        } else {
+            n / 8 + 1
+        }
+    }
+
+    fn read_n_bits(&mut self, n: usize) -> Result<Option<[u8; BYTE_ARRAY_SIZE]>, Box<dyn Error>> {
+        let mut mask = [255u8; BYTE_ARRAY_SIZE];
+        let mut vals = [0u8; BYTE_ARRAY_SIZE];
+
+        // Bookkeeping
+        let most_sig_byte = BYTE_ARRAY_SIZE - BitBuffer::num_bytes_to_hold_bits(n);
+        let bits_first_byte = if n % 8 == 0 { 8 } else { n % 8 };
+
+        // Build the mask
+        for i in 0..most_sig_byte {
+            mask[i] = 0;
+        }
+        mask[most_sig_byte] >>= 8 - bits_first_byte;
+
+        // Load the bytes
+        vals[most_sig_byte] = mask[most_sig_byte] & self.read_u8(bits_first_byte)?;
+        for i in (most_sig_byte + 1)..BYTE_ARRAY_SIZE {
+            vals[i] = mask[i] & self.read_u8(8)?;
+        }
+
+        // Check for BUFR missing value (all bits are set to 1
+        if vals == mask {
+            Ok(None)
+        } else {
+            Ok(Some(vals))
+        }
     }
 
     fn bits_remaining_in_buffer(&self) -> usize {
@@ -128,16 +171,25 @@ impl<'b> BitBuffer<'b> {
             byte >>= offset;
             val = byte;
 
-            // Addvance the bit buffer
+            // Advance the bit buffer
             self.bit_position += bits;
             if self.bit_position == 8 {
                 self.bit_position = 0;
                 self.byte_position += 1;
             }
-            debug_assert!(self.bit_position < 8, "self.bit_postion = {}", self.bit_position);
+            debug_assert!(
+                self.bit_position < 8,
+                "self.bit_postion = {}",
+                self.bit_position
+            );
         }
 
-        debug_assert!((val as u16) < (1u16 << bits), "value too big: {} >= {}", val, 1u16 << bits);
+        debug_assert!(
+            (val as u16) < (1u16 << bits),
+            "value too big: {} >= {}",
+            val,
+            1u16 << bits
+        );
         Ok(val)
     }
 
@@ -156,51 +208,46 @@ impl<'b> BitBuffer<'b> {
         Ok(String::from_utf8(buf)?)
     }
 
-    fn read_u64(&mut self, bits: usize) -> Result<u64, Box<dyn Error>> {
+    fn read_u64(&mut self, bits: usize) -> Result<Option<u64>, Box<dyn Error>> {
         debug_assert!(bits <= (8 * 8), "too many bits for u64: {}", bits);
         debug_assert!(bits > 0, "requested zero bits");
 
-        let mut vals_buf: [u8; 8] = [0; 8];
-
-        let mut num_bytes = bits / 8;
-        if bits % 8 > 0 {
-            num_bytes += 1;
-        }
-
-        //dbg!(num_bytes);
-        if bits % 8 > 0 {
-            vals_buf[8 - num_bytes] = self.read_u8(bits % 8)?;
-            //dbg!(vals_buf[8 - num_bytes]);
+        let vals_buf = self.read_n_bits(bits)?;
+        if let Some(vals_buf) = vals_buf {
+            let mut small_buf: [u8; 8] = [0; 8];
+            small_buf.clone_from_slice(&vals_buf[(BYTE_ARRAY_SIZE - 8)..]);
+            let val = u64::from_be_bytes(small_buf);
+            debug_assert!(
+                val < (1u64 << bits),
+                "val too large: {} >= {}",
+                val,
+                1u64 << bits
+            );
+            Ok(Some(val))
         } else {
-            vals_buf[8 - num_bytes] = self.read_u8(8)?;
-            //dbg!(vals_buf[8 - num_bytes]);
+            Ok(None)
         }
-
-        //dbg!(num_bytes);
-        for i in (1..num_bytes).rev() {
-            vals_buf[8 - i] = self.read_u8(8)?;
-            //dbg!(i, vals_buf[8-i]);
-        }
-
-        //dbg!(vals_buf);
-
-        let val = u64::from_be_bytes(vals_buf);
-        debug_assert!(val <  (1u64 << bits), "val too large: {} >= {}", val, 1u64 << bits);
-
-        Ok(val)
     }
 
-    pub fn read_usize(&mut self, bits: usize) -> Result<usize, Box<dyn Error>> {
+    pub fn read_usize(&mut self, bits: usize) -> Result<Option<usize>, Box<dyn Error>> {
         let val = self.read_u64(bits)?;
-
-        Ok(usize::try_from(val)?)
+        match val {
+            Some(val) => Ok(Some(usize::try_from(val)?)),
+            None => Ok(None),
+        }
     }
 
-    pub fn read_i64(&mut self, bits: usize, reference_val: i64) -> Result<i64, Box<dyn Error>> {
+    pub fn read_i64(
+        &mut self,
+        bits: usize,
+        reference_val: i64,
+    ) -> Result<Option<i64>, Box<dyn Error>> {
         let val = self.read_u64(bits)?;
 
-        let val = i64::try_from(val)? + reference_val;
-        Ok(val)
+        match val {
+            Some(val) => Ok(Some(i64::try_from(val)?)),
+            None => Ok(None),
+        }
     }
 
     pub fn read_f64(
@@ -208,14 +255,18 @@ impl<'b> BitBuffer<'b> {
         bits: usize,
         reference_val: i64,
         scale: i32,
-    ) -> Result<f64, Box<dyn Error>> {
-        let mut val = self.read_i64(bits, reference_val)? as f64;
-
-        if scale != 0 {
-            val /= f64::powi(10.0, scale);
-        }
+    ) -> Result<Option<f64>, Box<dyn Error>> {
+        let mut val = self
+            .read_i64(bits, reference_val)?
+            .map(|v| v as f64)
+            .map(|v| {
+                if scale != 0 {
+                    v / f64::powi(10.0, scale)
+                } else {
+                    v
+                }
+            });
 
         Ok(val)
     }
 }
-

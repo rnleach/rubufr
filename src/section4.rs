@@ -72,8 +72,9 @@ fn read_element_descriptor(
             //dbg!(val, "-x-x-x-x-x-x-x-x-x-x-x-x-x-");
             if is_array_val {
                 let vec = float_arrays.entry(name).or_insert(vec![]);
-                vec.push(val);
+                vec.push(val.unwrap_or(f64::NAN));
             } else {
+                let val = val.unwrap_or(f64::NAN);
                 let v = float_vals.insert(name, val);
                 debug_assert!(v.is_none(), "overwriting float val {}", name);
             }
@@ -92,7 +93,12 @@ fn read_replication_descriptor<'a>(
 ) -> Result<(), Box<dyn Error>> {
     //dbg!("read_replication_descriptor");
 
-    debug_assert_eq!(desc.f_value(), 1, "Not a replication descriptor, f={}", desc.f_value());
+    debug_assert_eq!(
+        desc.f_value(),
+        1,
+        "Not a replication descriptor, f={}",
+        desc.f_value()
+    );
 
     let num_descriptors = desc.x_value();
     //dbg!(num_descriptors);
@@ -107,16 +113,19 @@ fn read_replication_descriptor<'a>(
         let bits = match reps.y_value() {
             1 => 8,
             2 => 16,
-            _ => panic!("unimplemented replication descriptor: {}", reps.string_form()),
+            _ => panic!(
+                "unimplemented replication descriptor: {}",
+                reps.string_form()
+            ),
         };
 
-        num_repititions = f.read_usize(bits)?;
+        num_repititions = f.read_usize(bits)?.unwrap();
     }
 
     let mut descriptors = Vec::with_capacity(num_descriptors as usize);
 
     for _ in 0..num_descriptors {
-         match iter.next() {
+        match iter.next() {
             Some(desc) => descriptors.push(desc),
             None => panic!("Ran out of descriptors in replication!"),
         }
@@ -125,7 +134,6 @@ fn read_replication_descriptor<'a>(
 
     for _ in 0..num_repititions {
         for desc in &descriptors {
-            
             match desc.f_value() {
                 0 => read_element_descriptor(f, &desc, float_vals, float_arrays, true)?,
                 1 => read_replication_descriptor(f, &desc, iter, float_vals, float_arrays)?,
@@ -146,7 +154,6 @@ fn read_sequence_descriptor<'a>(
     float_arrays: &mut HashMap<&'static str, Vec<f64>>,
     in_array: bool,
 ) -> Result<(), Box<dyn Error>> {
-
     let sequence = table_d::TABLE_D.get(&desc.string_form() as &str).unwrap();
     let sequence: Vec<_> = sequence
         .iter()
@@ -206,10 +213,28 @@ pub(super) fn read_section_4(
         //dbg!(descriptor.string_form());
 
         match descriptor.f_value() {
-            0 => read_element_descriptor(&mut bit_buffer, descriptor, &mut float_vals, &mut float_arrays, false)?,
-            1 => read_replication_descriptor(&mut bit_buffer, descriptor, &mut desc_iter, &mut float_vals, &mut float_arrays)?,
+            0 => read_element_descriptor(
+                &mut bit_buffer,
+                descriptor,
+                &mut float_vals,
+                &mut float_arrays,
+                false,
+            )?,
+            1 => read_replication_descriptor(
+                &mut bit_buffer,
+                descriptor,
+                &mut desc_iter,
+                &mut float_vals,
+                &mut float_arrays,
+            )?,
             2 => panic!("Operator descriptors not supported at this time."),
-            3 => read_sequence_descriptor(&mut bit_buffer, descriptor, &mut float_vals, &mut float_arrays, false)?,
+            3 => read_sequence_descriptor(
+                &mut bit_buffer,
+                descriptor,
+                &mut float_vals,
+                &mut float_arrays,
+                false,
+            )?,
             _ => panic!("Unknown descriptor type."),
         }
     }
