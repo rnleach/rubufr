@@ -22,6 +22,8 @@ use section4::Section4;
 mod section5;
 use section5::Section5;
 
+mod bit_buffer;
+
 mod table_b;
 mod table_d;
 
