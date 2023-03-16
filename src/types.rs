@@ -335,20 +335,21 @@ fn print_structure_data(
         writeln!(f)?;
     }
 
-    for _ in 0..(2 * level) {
+    for _ in 0..(4 * level) {
         write!(f, " ")?;
     }
 
     match structure {
         Structure::Element(e) => {
-            write!(f, "Element: {} Units: {} Value: ", e.name, e.units)?;
+            write!(f, r#"Element: | Value: "#)?; 
             match &e.val {
-                Value::Missing => writeln!(f, "Missing")?,
-                Value::Float(v) => writeln!(f, "{}", v)?,
-                Value::Code(c) => writeln!(f, "{}", c)?,
-                Value::Numeric(n) => writeln!(f, "{}", n)?,
-                Value::Str(s) => writeln!(f, "{}", s.trim_matches('\0'))?,
+                Value::Missing => write!(f, "{:12}", "Missing")?,
+                Value::Float(v) => write!(f, "{:12}", v)?,
+                Value::Code(c) => write!(f, "{:12}", c)?,
+                Value::Numeric(n) => write!(f, "{:12}", n)?,
+                Value::Str(s) => write!(f, r#"{:12}"#, s)?,
             }
+            writeln!(f, r#" | Units: {:12} | Name: "{}""#, e.units, e.name)?;
         }
         Structure::Replication(r) => {
             writeln!(f, "Replication ({})", r.items.len())?;
@@ -357,7 +358,7 @@ fn print_structure_data(
             }
         }
         Structure::Group(g) => {
-            writeln!(f, "Group: {}", g.name)?;
+            writeln!(f, r#"Group: "{}""#, g.name)?;
             for item in &g.items {
                 print_structure_data(f, item, level + 1)?;
             }
