@@ -165,7 +165,9 @@ impl BitBuffer {
         let mut buf: Vec<u8> = Vec::with_capacity(num_chars);
         for _ in 0..num_chars {
             let c = self.read_u8(8)?;
-            buf.push(c);
+            if c != b'\0' {
+                buf.push(c);
+            }
         }
 
         Ok(String::from_utf8(buf)?)
