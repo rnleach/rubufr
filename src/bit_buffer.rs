@@ -171,7 +171,7 @@ impl BitBuffer {
         Ok(String::from_utf8(buf)?)
     }
 
-    fn read_u64(&mut self, bits: usize) -> Result<Option<u64>, Box<dyn Error>> {
+    pub fn read_u64(&mut self, bits: usize) -> Result<Option<u64>, Box<dyn Error>> {
         debug_assert!(bits <= (8 * 8), "too many bits for u64: {}", bits);
         debug_assert!(bits > 0, "requested zero bits");
 

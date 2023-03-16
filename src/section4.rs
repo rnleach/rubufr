@@ -1,15 +1,14 @@
-use super::{read_1_octet_u8, read_3_octet_usize};
 use crate::{
     bit_buffer::BitBuffer,
-    section3::{Descriptor, Section3},
+    read_1_octet_u8, read_3_octet_usize,
+    section3::Descriptor,
     table_b, table_d,
+    types::{BufrMessageBuilder, Element, Group, Replication, Structure, Value},
 };
-use std::{collections::HashMap, error::Error, fmt::Display, io::Read};
+use std::{error::Error, fmt::Display, io::Read};
 
 pub struct Section4 {
     section_size: usize,
-    float_vals: HashMap<&'static str, f64>,
-    float_arrays: HashMap<&'static str, Vec<f64>>,
 }
 
 impl Display for Section4 {
@@ -17,17 +16,6 @@ impl Display for Section4 {
         writeln!(f, "Section Size: {}", self.section_size)?;
         writeln!(f)?;
 
-        writeln!(f, "Float Values:")?;
-        for (k, v) in self.float_vals.iter() {
-            writeln!(f, "    {} : {}", k, v)?;
-        }
-        writeln!(f)?;
-
-        writeln!(f, "Float Arrays:")?;
-        for (k, v) in self.float_arrays.iter() {
-            writeln!(f, "    {}: {} values", k, v.len())?;
-        }
-        writeln!(f)?;
         Ok(())
     }
 }
@@ -40,59 +28,40 @@ pub struct TableBEntry {
     pub(crate) scale_val: i32,
 }
 
+pub struct TableDEntry {
+    pub(crate) group_name: &'static str,
+    pub(crate) elements: Vec<&'static str>,
+}
+
 fn read_element_descriptor(
     f: &mut BitBuffer,
     desc: &Descriptor,
-    float_vals: &mut HashMap<&'static str, f64>,
-    float_arrays: &mut HashMap<&'static str, Vec<f64>>,
-    is_array_val: bool,
-) -> Result<(), Box<dyn Error>> {
-    //dbg!("read_element_descriptor");
-
+) -> Result<Element, Box<dyn Error>> {
     let desc = table_b::TABLE_B.get(&desc.string_form() as &str).unwrap();
     let bits = desc.width_bits;
     let name = desc.element_name;
-    //dbg!(name, desc.units, bits, desc.reference_val, desc.scale_val);
 
-    match desc.units {
-        "CCITT IA5" => {
-            let _val = f.read_text(bits)?;
-            //dbg!(val, "-+-+-+-+-+-+-+-+-+-+-+-+-+-");
-        }
-        "Numeric" => {
-            let _val = f.read_i64(bits, desc.reference_val)?;
-            //dbg!(val, "-*-*-*-*-*-*-*-*-*-*-*-*-*-");
-        }
-        "Code table" => {
-            let _val = f.read_i64(bits, desc.reference_val)?;
-            //dbg!(val, "-^-^-^-^-^-^-^-^-^-^-^-^-^-");
-        }
-        _ => {
-            let val = f.read_f64(bits, desc.reference_val, desc.scale_val)?;
-            //dbg!(val, "-x-x-x-x-x-x-x-x-x-x-x-x-x-");
-            if is_array_val {
-                let vec = float_arrays.entry(name).or_insert(vec![]);
-                vec.push(val.unwrap_or(f64::NAN));
-            } else {
-                let val = val.unwrap_or(f64::NAN);
-                let v = float_vals.insert(name, val);
-                debug_assert!(v.is_none(), "overwriting float val {}", name);
-            }
-        }
-    }
+    let value = match desc.units {
+        "CCITT IA5" => Value::Str(f.read_text(bits)?),
+        "Numeric" => f
+            .read_i64(bits, desc.reference_val)?
+            .map(Value::Numeric)
+            .unwrap_or(Value::Missing),
+        "Code table" => f.read_u64(bits)?.map(Value::Code).unwrap_or(Value::Missing),
+        _ => f
+            .read_f64(bits, desc.reference_val, desc.scale_val)?
+            .map(Value::Float)
+            .unwrap_or(Value::Missing),
+    };
 
-    Ok(())
+    Ok(Element::new(value, desc.units, name))
 }
 
 fn read_replication_descriptor<'a>(
     f: &mut BitBuffer,
     desc: &Descriptor,
     iter: &mut dyn Iterator<Item = &'a Descriptor>,
-    float_vals: &mut HashMap<&'static str, f64>,
-    float_arrays: &mut HashMap<&'static str, Vec<f64>>,
-) -> Result<(), Box<dyn Error>> {
-    //dbg!("read_replication_descriptor");
-
+) -> Result<Replication, Box<dyn Error>> {
     debug_assert_eq!(
         desc.f_value(),
         1,
@@ -101,10 +70,8 @@ fn read_replication_descriptor<'a>(
     );
 
     let num_descriptors = desc.x_value();
-    //dbg!(num_descriptors);
 
     let mut num_repititions: usize = desc.y_value() as usize;
-    //dbg!(num_repititions);
 
     if num_repititions == 0 {
         let reps = iter.next().unwrap();
@@ -119,7 +86,7 @@ fn read_replication_descriptor<'a>(
             ),
         };
 
-        num_repititions = f.read_usize(bits)?.unwrap();
+        num_repititions = f.read_usize(bits)?.expect("Missing number of reps!?");
     }
 
     let mut descriptors = Vec::with_capacity(num_descriptors as usize);
@@ -132,35 +99,39 @@ fn read_replication_descriptor<'a>(
     }
     let descriptors = descriptors;
 
+    let mut rep = Replication::new_with_capacity(num_repititions);
+
     for _ in 0..num_repititions {
         for desc in &descriptors {
-            match desc.f_value() {
-                0 => read_element_descriptor(f, &desc, float_vals, float_arrays, true)?,
-                1 => read_replication_descriptor(f, &desc, iter, float_vals, float_arrays)?,
+            let structure = match desc.f_value() {
+                0 => Structure::Element(read_element_descriptor(f, &desc)?),
+                1 => Structure::Replication(read_replication_descriptor(f, &desc, iter)?),
                 2 => panic!("Operator descriptors not supported at this time."),
-                3 => read_sequence_descriptor(f, &desc, float_vals, float_arrays, true)?,
+                3 => Structure::Group(read_sequence_descriptor(f, &desc)?),
                 _ => panic!("Unknown descriptor type."),
-            }
+            };
+
+            rep.push(structure);
         }
     }
 
-    Ok(())
+    Ok(rep)
 }
 
 fn read_sequence_descriptor<'a>(
     f: &mut BitBuffer,
     desc: &Descriptor,
-    float_vals: &mut HashMap<&'static str, f64>,
-    float_arrays: &mut HashMap<&'static str, Vec<f64>>,
-    in_array: bool,
-) -> Result<(), Box<dyn Error>> {
-    let sequence = table_d::TABLE_D.get(&desc.string_form() as &str).unwrap();
-    let sequence: Vec<_> = sequence
+) -> Result<Group, Box<dyn Error>> {
+    let entry = table_d::TABLE_D.get(&desc.string_form() as &str).unwrap();
+    let sequence: Vec<_> = entry
+        .elements
         .iter()
         .map(|d| Descriptor::from_string_form(d))
         .collect();
 
     let mut desc_iter = sequence.iter();
+
+    let mut group = Group::new_with_capacity(sequence.len(), entry.group_name);
 
     loop {
         let desc = match desc_iter.next() {
@@ -168,26 +139,25 @@ fn read_sequence_descriptor<'a>(
             None => break,
         };
 
-        //dbg!("read_sequence_descriptor loop", desc.string_form(), "-------------------");
-
-        match desc.f_value() {
-            0 => read_element_descriptor(f, &desc, float_vals, float_arrays, in_array)?,
-            1 => read_replication_descriptor(f, &desc, &mut desc_iter, float_vals, float_arrays)?,
+        let structure = match desc.f_value() {
+            0 => Structure::Element(read_element_descriptor(f, &desc)?),
+            1 => Structure::Replication(read_replication_descriptor(f, &desc, &mut desc_iter)?),
             2 => panic!("Operator descriptors not supported at this time."),
-            3 => read_sequence_descriptor(f, &desc, float_vals, float_arrays, in_array)?,
+            3 => Structure::Group(read_sequence_descriptor(f, &desc)?),
             _ => panic!("Unknown descriptor type."),
-        }
+        };
+
+        group.push(structure);
     }
-    Ok(())
+    Ok(group)
 }
 
 pub(super) fn read_section_4(
     mut f: impl Read,
-    sec3: &Section3,
-) -> Result<Section4, Box<dyn Error>> {
+    descriptors: Vec<Descriptor>,
+    builder: &mut BufrMessageBuilder,
+) -> Result<(), Box<dyn Error>> {
     let mut octets_read: usize = 0;
-    let mut float_vals = HashMap::new();
-    let mut float_arrays = HashMap::new();
 
     let section_size = read_3_octet_usize(&mut f)?;
     octets_read += 3;
@@ -197,7 +167,6 @@ pub(super) fn read_section_4(
     octets_read += 1;
     debug_assert_eq!(reserved, 0, "Section 4: Octet 4 must be zero.");
 
-    let descriptors = sec3.descriptors();
     assert!(!descriptors.is_empty());
 
     let mut desc_iter = descriptors.iter();
@@ -205,39 +174,30 @@ pub(super) fn read_section_4(
     let bytes_left_in_section = section_size - octets_read;
     let mut bit_buffer = BitBuffer::new(&mut f, bytes_left_in_section)?;
 
+    let mut vec = vec![];
+
     loop {
         let descriptor = match desc_iter.next() {
             Some(desc) => desc,
             None => break,
         };
-        //dbg!(descriptor.string_form());
 
-        match descriptor.f_value() {
-            0 => read_element_descriptor(
-                &mut bit_buffer,
-                descriptor,
-                &mut float_vals,
-                &mut float_arrays,
-                false,
-            )?,
-            1 => read_replication_descriptor(
+        let structure = match descriptor.f_value() {
+            0 => Structure::Element(read_element_descriptor(&mut bit_buffer, descriptor)?),
+            1 => Structure::Replication(read_replication_descriptor(
                 &mut bit_buffer,
                 descriptor,
                 &mut desc_iter,
-                &mut float_vals,
-                &mut float_arrays,
-            )?,
+            )?),
             2 => panic!("Operator descriptors not supported at this time."),
-            3 => read_sequence_descriptor(
-                &mut bit_buffer,
-                descriptor,
-                &mut float_vals,
-                &mut float_arrays,
-                false,
-            )?,
+            3 => Structure::Group(read_sequence_descriptor(&mut bit_buffer, descriptor)?),
             _ => panic!("Unknown descriptor type."),
-        }
+        };
+
+        vec.push(structure);
     }
+
+    builder.elements(vec);
 
     octets_read += bytes_left_in_section;
 
@@ -246,9 +206,5 @@ pub(super) fn read_section_4(
         let _v = read_1_octet_u8(&mut f)?;
     }
 
-    Ok(Section4 {
-        section_size,
-        float_vals,
-        float_arrays,
-    })
+    Ok(())
 }

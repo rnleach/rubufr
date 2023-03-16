@@ -1,4 +1,4 @@
-use super::{read_1_octet_u8, read_2_octet_u16, read_3_octet_usize};
+use crate::{read_1_octet_u8, read_2_octet_u16, read_3_octet_usize, types::BufrMessageBuilder};
 use std::{error::Error, fmt::Display, io::Read};
 
 pub struct Section3 {
@@ -23,16 +23,6 @@ impl Display for Section3 {
         writeln!(f)?;
 
         Ok(())
-    }
-}
-
-impl Section3 {
-    pub fn descriptors(&self) -> &[Descriptor] {
-        &self.descriptors
-    }
-
-    pub fn compressed_data(&self) -> bool {
-        self.compressed_data
     }
 }
 
@@ -99,7 +89,8 @@ impl Descriptor {
 }
 
 #[rustfmt::skip]
-pub(super) fn read_section_3(mut f: impl Read) -> Result<Section3, Box<dyn Error>> {
+pub(super) fn read_section_3(mut f: impl Read, builder: &mut BufrMessageBuilder) -> Result<Vec<Descriptor>, Box<dyn Error>> {
+
     let mut octets_read: usize = 0;
 
     let section_size = read_3_octet_usize(&mut f)?;
@@ -111,6 +102,7 @@ pub(super) fn read_section_3(mut f: impl Read) -> Result<Section3, Box<dyn Error
     debug_assert_eq!(reserved, 0, "Section 3: Octet 4 must be zero.");
 
     let num_datasets = read_2_octet_u16(&mut f)?;
+    builder.num_datasets(num_datasets);
     octets_read += 2;
 
     let d_flags = read_1_octet_u8(&mut f)?;
@@ -122,8 +114,12 @@ pub(super) fn read_section_3(mut f: impl Read) -> Result<Section3, Box<dyn Error
     // TODO: Check if this is zero and return an error if it isn't
     debug_assert_eq!(bits_3_to_8, 0, "Section 3: Bits 3-8 nonzero in octet 7.");
 
+    // FIXME: Learn to handle compressed data
+    assert!(!compressed_data, "Compressed data handling not implemented.");
+
+    builder.observed_data(observed_data).compressed_data(compressed_data);
+
     let num_descriptors = (section_size - 7) / 2;
-    //dbg!(num_descriptors);
 
     let mut descriptors = Vec::with_capacity(num_descriptors);
     for _ in 0..num_descriptors {
@@ -133,17 +129,9 @@ pub(super) fn read_section_3(mut f: impl Read) -> Result<Section3, Box<dyn Error
     }
 
     // Push the stream ahead to the end of the section
-    //dbg!(section_size - octets_read);
     for _ in 0..(section_size - octets_read) {
         let _v = read_1_octet_u8(&mut f)?;
-        //dbg!(v);
     }
 
-    Ok(Section3 {
-        section_size,
-        num_datasets,
-        observed_data,
-        compressed_data,
-        descriptors,
-    })
+    Ok(descriptors)
 }

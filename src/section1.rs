@@ -1,4 +1,4 @@
-use super::{read_1_octet_u8, read_2_octet_u16, read_3_octet_usize};
+use crate::{read_1_octet_u8, read_2_octet_u16, read_3_octet_usize, types::BufrMessageBuilder};
 use std::{error::Error, fmt::Display, io::Read};
 
 pub struct Section1 {
@@ -20,12 +20,6 @@ pub struct Section1 {
     minute: u8,
     second: u8,
     extra_data: Vec<u8>,
-}
-
-impl Section1 {
-    pub fn section_2_exists(&self) -> bool {
-        self.section_2_present
-    }
 }
 
 impl Display for Section1 {
@@ -61,7 +55,7 @@ impl Display for Section1 {
 }
 
 #[rustfmt::skip]
-pub(super) fn read_section_1(mut f: impl Read) -> Result<Section1, Box<dyn Error>> {
+pub(super) fn read_section_1(mut f: impl Read, builder: &mut BufrMessageBuilder) -> Result<bool, Box<dyn Error>> {
     let section_size = read_3_octet_usize(&mut f)?;                                 // octets 1-3
     let master_table = read_1_octet_u8(&mut f)?;                                    // octet 4
     let originating_center = read_2_octet_u16(&mut f)?;                             // octets 5-6
@@ -83,24 +77,23 @@ pub(super) fn read_section_1(mut f: impl Read) -> Result<Section1, Box<dyn Error
     let mut extra_data = vec![];
     f.take(section_size as u64 - 22).read_to_end(&mut extra_data)?;
 
-    Ok(Section1 {
-        section_size,
-        master_table,
-        originating_center,
-        originating_subcenter,
-        update_num,
-        section_2_present,
-        data_category,
-        data_subcategory,
-        local_data_subcategory,
-        bufr_master_table_version,
-        local_tables_version,
-        year,
-        month,
-        day,
-        hour,
-        minute,
-        second,
-        extra_data,
-    })
+    builder.master_table(master_table)
+        .originating_center(originating_center)
+        .originating_subcenter(originating_subcenter)
+        .update_num(update_num)
+        .data_category(data_category)
+        .data_subcategory(data_subcategory)
+        .local_data_subcategory(local_data_subcategory)
+        // TODO Check the master tables version is 0 or 10.
+        .bufr_master_table_version(bufr_master_table_version)
+        .local_tables_version(local_tables_version)
+        .year(year)
+        .month(month)
+        .day(day)
+        .hour(hour)
+        .minute(minute)
+        .second(second)
+        .extra_seciont_1_data(extra_data);
+
+    Ok(section_2_present)
 }

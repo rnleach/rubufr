@@ -1,11 +1,11 @@
-use crate::read_1_octet_u8;
+use crate::{read_1_octet_u8, types::BufrMessageBuilder};
 
 use super::read_3_octet_usize;
 use std::{error::Error, fmt::Display, io::Read};
 
 pub struct Section2 {
     section_size: usize,
-    section_data: Option<Vec<u8>>,
+    pub(crate) section_data: Option<Vec<u8>>,
 }
 
 impl Display for Section2 {
@@ -23,31 +23,19 @@ impl Display for Section2 {
 
 pub(super) fn read_section_2(
     mut f: impl Read,
-    section_2_present: bool,
-) -> Result<Section2, Box<dyn Error>> {
-    if section_2_present {
-        let section_size = read_3_octet_usize(&mut f)?;
+    builder: &mut BufrMessageBuilder,
+) -> Result<(), Box<dyn Error>> {
+    let section_size = read_3_octet_usize(&mut f)?;
 
-        // TODO: Check if this is zero and return an error if it isn't
-        let reserved = read_1_octet_u8(&mut f)?;
-        debug_assert_eq!(reserved, 0);
+    // TODO: Check if this is zero and return an error if it isn't
+    let reserved = read_1_octet_u8(&mut f)?;
+    debug_assert_eq!(reserved, 0);
 
-        let mut section_data = vec![];
-        f.take(section_size as u64 - 4)
-            .read_to_end(&mut section_data)?;
-        let section_data = Some(section_data);
+    let mut section_data = vec![];
+    f.take(section_size as u64 - 4)
+        .read_to_end(&mut section_data)?;
 
-        Ok(Section2 {
-            section_size,
-            section_data,
-        })
-    } else {
-        let section_size = 0;
-        let section_data = None;
+    builder.section_2_data(section_data);
 
-        Ok(Section2 {
-            section_size,
-            section_data,
-        })
-    }
+    Ok(())
 }

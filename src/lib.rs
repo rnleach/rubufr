@@ -27,7 +27,10 @@ mod bit_buffer;
 mod table_b;
 mod table_d;
 
-pub struct BufrMessage {
+mod types;
+pub use types::BufrMessage;
+
+pub struct BufrMessageSections {
     section_0: Section0,
     section_1: Section1,
     section_2: Section2,
@@ -37,22 +40,20 @@ pub struct BufrMessage {
 }
 
 pub fn read_bufr_message(mut f: impl Read) -> Result<BufrMessage, Box<dyn Error>> {
-    // Read section 0
-    let section_0 = section0::read_section_0(&mut f)?;
-    let section_1 = section1::read_section_1(&mut f)?;
-    let section_2 = section2::read_section_2(&mut f, section_1.section_2_exists())?;
-    let section_3 = section3::read_section_3(&mut f)?;
-    let section_4 = section4::read_section_4(&mut f, &section_3)?;
-    let section_5 = section5::read_section_5(&mut f)?;
+    let mut builder = types::BufrMessageBuilder::new();
 
-    Ok(BufrMessage {
-        section_0,
-        section_1,
-        section_2,
-        section_3,
-        section_4,
-        section_5,
-    })
+    section0::read_section_0(&mut f, &mut builder)?;
+    let section_2_exists = section1::read_section_1(&mut f, &mut builder)?;
+
+    if section_2_exists {
+        section2::read_section_2(&mut f, &mut builder)?;
+    }
+
+    let descriptors = section3::read_section_3(&mut f, &mut builder)?;
+    section4::read_section_4(&mut f, descriptors, &mut builder)?;
+    section5::read_section_5(&mut f)?;
+
+    Ok(builder.build())
 }
 
 pub fn scan_to_bufr_start(mut f: impl Seek + Read) -> Result<(), Box<dyn Error>> {
@@ -92,7 +93,7 @@ pub fn scan_to_bufr_start(mut f: impl Seek + Read) -> Result<(), Box<dyn Error>>
     }
 }
 
-impl Display for BufrMessage {
+impl Display for BufrMessageSections {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         writeln!(f, "Section 0:")?;
         writeln!(f, "{}", self.section_0)?;

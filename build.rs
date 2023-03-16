@@ -137,8 +137,9 @@ fn make_table_d() -> Result<(), Box<dyn Error>> {
     reader.trim_text(true);
 
     let mut buf = Vec::new();
-    let mut in_fxy1 = false;
-    let mut in_fxy2 = false;
+    let mut txt = String::new();
+
+    let mut group_name = String::new();
     let mut fxy1 = String::new();
     let mut fxy2 = String::new();
 
@@ -147,42 +148,35 @@ fn make_table_d() -> Result<(), Box<dyn Error>> {
             Event::Eof => break,
 
             Event::Start(e) => match e.name().as_ref() {
-                b"FXY1" => {
-                    debug_assert!(!in_fxy1 && !in_fxy2);
-                    in_fxy1 = true;
+                b"BUFR_TableD_en" => {
                     fxy1.clear();
-                }
-                b"FXY2" => {
-                    debug_assert!(!in_fxy1 && !in_fxy2);
-                    in_fxy2 = true;
                     fxy2.clear();
+                    group_name.clear();
                 }
-                _ => {}
+                _ => {
+                    txt.clear();
+                }
             },
             Event::End(e) => match e.name().as_ref() {
+                b"BUFR_TableD_en" => {
+                    let key = fxy1.clone();
+                    let fxy2 = fxy2.clone();
+                    let group_name = group_name.clone();
+                    let (_name, vals) = table_d.entry(key).or_insert((group_name, vec![]));
+                    vals.push(fxy2);
+                }
                 b"FXY1" => {
-                    debug_assert!(in_fxy1 && !in_fxy2);
-                    in_fxy1 = false;
+                    fxy1.push_str(&txt);
                 }
                 b"FXY2" => {
-                    debug_assert!(!in_fxy1 && in_fxy2);
-                    in_fxy2 = false;
-
-                    {
-                        let fxy1 = fxy1.clone();
-                        let vals = table_d.entry(fxy1).or_insert(vec![]);
-                        vals.push(fxy2.clone());
-                    }
+                    fxy2.push_str(&txt);
+                }
+                b"ElementName_en" => {
+                    group_name.push_str(&txt);
                 }
                 _ => {}
             },
-            Event::Text(e) => {
-                if in_fxy1 {
-                    fxy1.push_str(&e.unescape().unwrap());
-                } else if in_fxy2 {
-                    fxy2.push_str(&e.unescape().unwrap());
-                }
-            }
+            Event::Text(e) => txt.push_str(&e.unescape().unwrap()),
 
             // There are several other `Event`s we do not consider here
             _ => {}
@@ -191,7 +185,7 @@ fn make_table_d() -> Result<(), Box<dyn Error>> {
         buf.clear();
     }
 
-    let mut writer = BufWriter::new(
+    let mut w = BufWriter::new(
         OpenOptions::new()
             .write(true)
             .truncate(true)
@@ -200,26 +194,31 @@ fn make_table_d() -> Result<(), Box<dyn Error>> {
     );
 
     // Output the rust hashmap
-    writeln!(writer, "use lazy_static::lazy_static;")?;
-    writeln!(writer, "use std::collections::HashMap;")?;
-    writeln!(writer)?;
-    writeln!(writer, "lazy_static! {{")?;
+    writeln!(w, "use lazy_static::lazy_static;")?;
+    writeln!(w, "use std::collections::HashMap;")?;
+    writeln!(w, "use super::section4::TableDEntry;")?;
+    writeln!(w)?;
+    writeln!(w, "lazy_static! {{")?;
     writeln!(
-        writer,
-        "    pub static ref TABLE_D: HashMap<&'static str, Vec<&'static str>> = ["
+        w,
+        "    pub static ref TABLE_D: HashMap<&'static str, TableDEntry> = ["
     )?;
 
-    for (fxy1, fxy2s) in table_d {
-        write!(writer, "        (\"{}\", vec![\"{}\"", fxy1, fxy2s[0])?;
+    for (key, (name, fxy2s)) in table_d {
+        write!(
+            w,
+            r##"("{}", TableDEntry{{group_name:r#"{}"#, elements:vec![r#"{}"#"##,
+            key, name, fxy2s[0]
+        )?;
         for fxy2 in fxy2s.into_iter().skip(1) {
-            write!(writer, ", \"{}\"", fxy2)?;
+            write!(w, r##", r#"{}"#"##, fxy2)?;
         }
-        writeln!(writer, "]),")?;
+        writeln!(w, "]}}),")?;
     }
 
     // Close out the enum
-    writeln!(writer, "        ].into_iter().collect();")?;
-    writeln!(writer, "}}")?;
+    writeln!(w, "        ].into_iter().collect();")?;
+    writeln!(w, "}}")?;
 
     Ok(())
 }
