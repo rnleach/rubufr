@@ -2,47 +2,34 @@ use std::{error::Error, io::Read};
 
 use crate::table_b;
 
-// Use a buffer 8 times the size of the largest set of bits we need to read.
-// Notice we're going from bits to bytes here.
-const BUF_SIZE: usize = table_b::MAX_BIT_WIDTH;
 const BYTE_ARRAY_SIZE: usize = if table_b::MAX_BIT_WIDTH % 8 == 0 {
     table_b::MAX_BIT_WIDTH / 8
 } else {
     table_b::MAX_BIT_WIDTH / 8 + 1
 };
 
-pub(crate) struct BitBuffer<'b> {
-    // The source
-    reader: &'b mut dyn Read,
+pub(crate) struct BitBuffer {
+    // The whole data set loaded into memory
+    buffer: Vec<u8>,
 
-    // Track where we are in the source.
-    max_bytes_to_read: usize,
-    bytes_read: usize,
-
-    // The buffer
-    buffer: [u8; BUF_SIZE],
-    buffer_len: usize,
-
-    // Track where we are in the buffer
-    byte_position: usize,
+    // Position of next bit to read in current byte
     bit_position: usize,
+
+    // The current byte
+    byte_position: usize,
 }
 
-impl<'b> BitBuffer<'b> {
-    pub fn new(reader: &'b mut dyn Read, max_bytes_to_read: usize) -> Self {
-        BitBuffer {
-            reader,
-            max_bytes_to_read,
-            bytes_read: 0,
-            buffer: [0; BUF_SIZE],
+impl BitBuffer {
+    pub fn new(reader: &mut dyn Read, to_read: usize) -> Result<Self, Box<dyn Error>> {
+        let mut buffer = Vec::with_capacity(to_read);
+        let num_read = reader.take(to_read.try_into()?).read_to_end(&mut buffer)?;
+        assert_eq!(num_read, to_read);
+
+        Ok(BitBuffer {
+            buffer,
             byte_position: 0,
             bit_position: 0,
-            buffer_len: 0,
-        }
-    }
-
-    pub fn bytes_read(&self) -> usize {
-        self.bytes_read
+        })
     }
 
     fn num_bytes_to_hold_bits(n: usize) -> usize {
@@ -81,51 +68,29 @@ impl<'b> BitBuffer<'b> {
         }
     }
 
-    fn bits_remaining_in_buffer(&self) -> usize {
-        (self.buffer_len - self.byte_position) * 8 - self.bit_position
-    }
-
-    fn refill_buffer(&mut self) -> Result<(), Box<dyn Error>> {
-        if self.max_bytes_to_read - self.bytes_read >= BUF_SIZE {
-            self.reader.read_exact(&mut self.buffer)?;
-            self.buffer_len = BUF_SIZE;
-            self.bytes_read += BUF_SIZE;
-        } else {
-            let num_bytes_remaining = self.max_bytes_to_read - self.bytes_read;
-            let mut buf = &mut self.buffer[0..num_bytes_remaining];
-            self.reader.read_exact(&mut buf)?;
-            self.buffer_len = num_bytes_remaining;
-            self.bytes_read += num_bytes_remaining;
-        }
-
-        self.byte_position = 0;
-        self.bit_position = 0;
-
-        Ok(())
-    }
-
-    fn next_byte(&mut self) -> Result<u8, Box<dyn Error>> {
-        if self.bits_remaining_in_buffer() == 0 {
-            self.refill_buffer()?;
-        }
-
-        Ok(self.buffer[self.byte_position])
+    fn next_byte(&mut self) -> u8 {
+        self.buffer[self.byte_position]
     }
 
     fn read_u8(&mut self, bits: usize) -> Result<u8, Box<dyn Error>> {
         debug_assert!(bits <= 8, "bits too large {} > 8", bits);
         debug_assert!(bits > 0, "requested zero bits");
 
-        //dbg!(bits);
+        // Detect overflow
+        if self.byte_position >= self.buffer.len() {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "buffer overlfow",
+            )));
+        }
 
         let mut val: u8 = 0;
 
         let bits_left_in_byte = 8 - self.bit_position;
         if bits_left_in_byte < bits {
-            //dbg!("Not all my bits are in this byte.");
             // Not all my bits are in this byte
 
-            let byte = self.next_byte()?;
+            let byte = self.next_byte();
 
             // Need to get the rightmost bits
             let mask = 0b1111_1111 >> (8 - bits_left_in_byte);
@@ -139,7 +104,7 @@ impl<'b> BitBuffer<'b> {
             self.byte_position += 1;
 
             // Get the next byte
-            let mut byte = self.next_byte()?;
+            let mut byte = self.next_byte();
 
             // Get the leftmost how many bits?
             byte >>= 8 - num_bits_in_next_byte;
@@ -148,9 +113,8 @@ impl<'b> BitBuffer<'b> {
             // Advance the bit buffer
             self.bit_position += num_bits_in_next_byte;
         } else {
-            //dbg!("All my bits are in this byte.", self.bit_position);
             // All my bits are here
-            let mut byte = self.next_byte()?;
+            let mut byte = self.next_byte();
 
             // Example - self.bit_position = 1
             //           bits = 5
@@ -190,6 +154,7 @@ impl<'b> BitBuffer<'b> {
             val,
             1u16 << bits
         );
+
         Ok(val)
     }
 
@@ -197,11 +162,9 @@ impl<'b> BitBuffer<'b> {
         debug_assert_eq!(bits % 8, 0, "funky string size");
 
         let num_chars = bits / 8;
-        //dbg!(num_chars, bits);
         let mut buf: Vec<u8> = Vec::with_capacity(num_chars);
         for _ in 0..num_chars {
             let c = self.read_u8(8)?;
-            //dbg!(c);
             buf.push(c);
         }
 
@@ -245,7 +208,7 @@ impl<'b> BitBuffer<'b> {
         let val = self.read_u64(bits)?;
 
         match val {
-            Some(val) => Ok(Some(i64::try_from(val)?)),
+            Some(val) => Ok(Some(i64::try_from(val)? + reference_val)),
             None => Ok(None),
         }
     }
@@ -256,7 +219,7 @@ impl<'b> BitBuffer<'b> {
         reference_val: i64,
         scale: i32,
     ) -> Result<Option<f64>, Box<dyn Error>> {
-        let mut val = self
+        let val = self
             .read_i64(bits, reference_val)?
             .map(|v| v as f64)
             .map(|v| {

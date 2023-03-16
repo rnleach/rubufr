@@ -203,7 +203,7 @@ pub(super) fn read_section_4(
     let mut desc_iter = descriptors.iter();
 
     let bytes_left_in_section = section_size - octets_read;
-    let mut bit_buffer = BitBuffer::new(&mut f, bytes_left_in_section);
+    let mut bit_buffer = BitBuffer::new(&mut f, bytes_left_in_section)?;
 
     loop {
         let descriptor = match desc_iter.next() {
@@ -239,10 +239,9 @@ pub(super) fn read_section_4(
         }
     }
 
-    octets_read += bit_buffer.bytes_read();
+    octets_read += bytes_left_in_section;
 
     // Push the stream ahead to the end of the section
-    //dbg!(section_size - octets_read);
     for _ in 0..(section_size - octets_read) {
         let _v = read_1_octet_u8(&mut f)?;
     }
