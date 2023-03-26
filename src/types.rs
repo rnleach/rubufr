@@ -152,6 +152,10 @@ impl BufrMessageBuilder {
             panic!("multiple datasets not implemented");
         }
 
+        if self.bm.bufr_master_table_version > crate::MAX_BUFR_TABLE_VERSION_SUPPORTED {
+            panic!("data encoded with tables newer than supported in this version");
+        }
+
         self.bm
     }
 }
