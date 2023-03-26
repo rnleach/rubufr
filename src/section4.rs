@@ -2,7 +2,7 @@ use crate::{
     bit_buffer::BitBuffer,
     read_1_octet_u8, read_3_octet_usize,
     section3::Descriptor,
-    table_b, table_d,
+    tables::{table_b, table_d},
     types::{BufrMessageBuilder, Element, Group, Replication, Structure, Value},
 };
 use std::{error::Error, fmt::Display, io::Read};
@@ -18,19 +18,6 @@ impl Display for Section4 {
 
         Ok(())
     }
-}
-
-pub struct TableBEntry {
-    pub(crate) width_bits: usize,
-    pub(crate) element_name: &'static str,
-    pub(crate) units: &'static str,
-    pub(crate) reference_val: i64,
-    pub(crate) scale_val: i32,
-}
-
-pub struct TableDEntry {
-    pub(crate) group_name: &'static str,
-    pub(crate) elements: Vec<&'static str>,
 }
 
 fn read_element_descriptor(
@@ -54,7 +41,7 @@ fn read_element_descriptor(
             .unwrap_or(Value::Missing),
     };
 
-    Ok(Element::new(value, desc.units, name))
+    Ok(Element::new(value, desc.units, name,  desc.fxy))
 }
 
 fn read_replication_descriptor<'a>(
@@ -131,7 +118,7 @@ fn read_sequence_descriptor<'a>(
 
     let mut desc_iter = sequence.iter();
 
-    let mut group = Group::new_with_capacity(sequence.len(), entry.group_name);
+    let mut group = Group::new_with_capacity(sequence.len(), entry.group_name, entry.fxy);
 
     loop {
         let desc = match desc_iter.next() {

@@ -13,5 +13,5 @@ Cargo.lock
 *.vim
 tags
 
-# Generated files
-src/table_*.rs
+# Common temporary files
+test.txt

@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 const TABLE_B_INPUT: &str = "Tables/BUFRCREX_TableB_en.xml";
-const TABLE_B_OUTPUT: &str = "src/table_b.rs";
+const TABLE_B_OUTPUT: &str = "src/tables/table_b.rs";
 
 fn make_table_b() -> Result<(), Box<dyn Error>> {
     let mut table_b = HashMap::new();
@@ -102,7 +102,7 @@ fn make_table_b() -> Result<(), Box<dyn Error>> {
     // Output the rust hashmap
     writeln!(w, "use lazy_static::lazy_static;")?;
     writeln!(w, "use std::collections::HashMap;")?;
-    writeln!(w, "use super::section4::TableBEntry;")?;
+    writeln!(w, "use super::TableBEntry;")?;
     writeln!(w)?;
     writeln!(w, "pub const MAX_BIT_WIDTH: usize = {};", max_width_bits)?;
     writeln!(w)?;
@@ -115,8 +115,8 @@ fn make_table_b() -> Result<(), Box<dyn Error>> {
     for (key, value) in table_b.into_iter() {
         writeln!(
             w,
-            r##"("{}", TableBEntry{{width_bits:{}, element_name:r#"{}"#, units:r#"{}"#, reference_val: {}, scale_val: {}}}),"##,
-            key, value.4, value.0, value.1, value.3, value.2
+            r##"("{}", TableBEntry{{fxy:"{}", width_bits:{}, element_name:r#"{}"#, units:r#"{}"#, reference_val: {}, scale_val: {}}}),"##,
+            key, key, value.4, value.0, value.1, value.3, value.2
         )?;
     }
 
@@ -128,7 +128,7 @@ fn make_table_b() -> Result<(), Box<dyn Error>> {
 }
 
 const TABLE_D_INPUT: &str = "Tables/BUFR_TableD_en.xml";
-const TABLE_D_OUTPUT: &str = "src/table_d.rs";
+const TABLE_D_OUTPUT: &str = "src/tables/table_d.rs";
 
 fn make_table_d() -> Result<(), Box<dyn Error>> {
     let mut table_d = HashMap::new();
@@ -171,7 +171,7 @@ fn make_table_d() -> Result<(), Box<dyn Error>> {
                 b"FXY2" => {
                     fxy2.push_str(&txt);
                 }
-                b"ElementName_en" => {
+                b"Title_en" => {
                     group_name.push_str(&txt);
                 }
                 _ => {}
@@ -196,7 +196,7 @@ fn make_table_d() -> Result<(), Box<dyn Error>> {
     // Output the rust hashmap
     writeln!(w, "use lazy_static::lazy_static;")?;
     writeln!(w, "use std::collections::HashMap;")?;
-    writeln!(w, "use super::section4::TableDEntry;")?;
+    writeln!(w, "use super::TableDEntry;")?;
     writeln!(w)?;
     writeln!(w, "lazy_static! {{")?;
     writeln!(
@@ -207,8 +207,8 @@ fn make_table_d() -> Result<(), Box<dyn Error>> {
     for (key, (name, fxy2s)) in table_d {
         write!(
             w,
-            r##"("{}", TableDEntry{{group_name:r#"{}"#, elements:vec![r#"{}"#"##,
-            key, name, fxy2s[0]
+            r##"("{}", TableDEntry{{fxy:"{}", group_name:r#"{}"#, elements:vec![r#"{}"#"##,
+            key, key, name, fxy2s[0]
         )?;
         for fxy2 in fxy2s.into_iter().skip(1) {
             write!(w, r##", r#"{}"#"##, fxy2)?;

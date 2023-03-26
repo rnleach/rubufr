@@ -1,6 +1,6 @@
 use std::{error::Error, io::Read};
 
-use crate::table_b;
+use crate::tables::table_b;
 
 const BYTE_ARRAY_SIZE: usize = if table_b::MAX_BIT_WIDTH % 8 == 0 {
     table_b::MAX_BIT_WIDTH / 8

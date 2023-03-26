@@ -24,8 +24,7 @@ use section5::Section5;
 
 mod bit_buffer;
 
-mod table_b;
-mod table_d;
+mod tables;
 
 mod types;
 pub use types::BufrMessage;

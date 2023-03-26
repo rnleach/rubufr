@@ -273,26 +273,29 @@ pub(crate) enum Value {
 #[derive(Debug)]
 pub(crate) struct Element {
     val: Value,
+    fxy: &'static str,
     units: &'static str,
     name: &'static str,
 }
 
 impl Element {
-    pub fn new(val: Value, units: &'static str, name: &'static str) -> Self {
-        Self { val, units, name }
+    pub fn new(val: Value, units: &'static str, name: &'static str, fxy: &'static str) -> Self {
+        Self { val, units, name, fxy }
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct Group {
     items: Vec<Structure>,
+    fxy: &'static str,
     name: &'static str,
 }
 
 impl Group {
-    pub fn new_with_capacity(cap: usize, name: &'static str) -> Self {
+    pub fn new_with_capacity(cap: usize, name: &'static str, fxy: &'static str) -> Self {
         Group {
             name,
+            fxy,
             items: Vec::with_capacity(cap),
         }
     }
@@ -341,7 +344,7 @@ fn print_structure_data(
 
     match structure {
         Structure::Element(e) => {
-            write!(f, r#"Element: | Value: "#)?; 
+            write!(f, r#"Element: "{:6}" | Value: "#, e.fxy)?; 
             match &e.val {
                 Value::Missing => write!(f, "{:12}", "Missing")?,
                 Value::Float(v) => write!(f, "{:12}", v)?,
@@ -352,13 +355,13 @@ fn print_structure_data(
             writeln!(f, r#" | Units: {:12} | Name: "{}""#, e.units, e.name)?;
         }
         Structure::Replication(r) => {
-            writeln!(f, "Replication ({})", r.items.len())?;
+            writeln!(f, r#"Replication ({})"#, r.items.len())?;
             for item in &r.items {
                 print_structure_data(f, item, level + 1)?;
             }
         }
         Structure::Group(g) => {
-            writeln!(f, r#"Group: "{}""#, g.name)?;
+            writeln!(f, r#"Group: "{:6}" | "{}""#, g.fxy, g.name)?;
             for item in &g.items {
                 print_structure_data(f, item, level + 1)?;
             }
