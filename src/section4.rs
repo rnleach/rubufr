@@ -41,7 +41,7 @@ fn read_element_descriptor(
             .unwrap_or(Value::Missing),
     };
 
-    Ok(Element::new(value, desc.units, name,  desc.fxy))
+    Ok(Element::new(value, desc.units, name, desc.fxy))
 }
 
 fn read_replication_descriptor<'a>(

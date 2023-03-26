@@ -15,4 +15,3 @@ pub struct TableDEntry {
     pub(crate) group_name: &'static str,
     pub(crate) elements: Vec<&'static str>,
 }
-

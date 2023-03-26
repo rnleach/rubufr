@@ -280,7 +280,12 @@ pub(crate) struct Element {
 
 impl Element {
     pub fn new(val: Value, units: &'static str, name: &'static str, fxy: &'static str) -> Self {
-        Self { val, units, name, fxy }
+        Self {
+            val,
+            units,
+            name,
+            fxy,
+        }
     }
 }
 
@@ -344,7 +349,7 @@ fn print_structure_data(
 
     match structure {
         Structure::Element(e) => {
-            write!(f, r#"Element: "{:6}" | Value: "#, e.fxy)?; 
+            write!(f, r#"Element: "{:6}" | Value: "#, e.fxy)?;
             match &e.val {
                 Value::Missing => write!(f, "{:12}", "Missing")?,
                 Value::Float(v) => write!(f, "{:12}", v)?,
