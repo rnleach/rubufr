@@ -17,6 +17,9 @@ pub(crate) struct BitBuffer {
 
     // The current byte
     byte_position: usize,
+
+    // Internal buffer for decoding.
+    byte_buffer: [u8; BYTE_ARRAY_SIZE],
 }
 
 impl BitBuffer {
@@ -29,6 +32,7 @@ impl BitBuffer {
             buffer,
             byte_position: 0,
             bit_position: 0,
+            byte_buffer: [0; BYTE_ARRAY_SIZE],
         })
     }
 
@@ -40,9 +44,9 @@ impl BitBuffer {
         }
     }
 
-    fn read_n_bits(&mut self, n: usize) -> Result<Option<[u8; BYTE_ARRAY_SIZE]>, Box<dyn Error>> {
+    fn read_n_bits(&mut self, n: usize) -> Result<Option<&[u8]>, Box<dyn Error>> {
         let mut mask = [255u8; BYTE_ARRAY_SIZE];
-        let mut vals = [0u8; BYTE_ARRAY_SIZE];
+        self.byte_buffer = [0; BYTE_ARRAY_SIZE];
 
         // Bookkeeping
         let most_sig_byte = BYTE_ARRAY_SIZE - BitBuffer::num_bytes_to_hold_bits(n);
@@ -55,21 +59,17 @@ impl BitBuffer {
         mask[most_sig_byte] >>= 8 - bits_first_byte;
 
         // Load the bytes
-        vals[most_sig_byte] = mask[most_sig_byte] & self.read_u8(bits_first_byte)?;
+        self.byte_buffer[most_sig_byte] = mask[most_sig_byte] & self.read_u8(bits_first_byte)?;
         for i in (most_sig_byte + 1)..BYTE_ARRAY_SIZE {
-            vals[i] = mask[i] & self.read_u8(8)?;
+            self.byte_buffer[i] = mask[i] & self.read_u8(8)?;
         }
 
         // Check for BUFR missing value (all bits are set to 1
-        if vals == mask {
+        if self.byte_buffer == mask {
             Ok(None)
         } else {
-            Ok(Some(vals))
+            Ok(Some(&self.byte_buffer[most_sig_byte..]))
         }
-    }
-
-    fn next_byte(&mut self) -> u8 {
-        self.buffer[self.byte_position]
     }
 
     fn read_u8(&mut self, bits: usize) -> Result<u8, Box<dyn Error>> {
@@ -90,7 +90,7 @@ impl BitBuffer {
         if bits_left_in_byte < bits {
             // Not all my bits are in this byte
 
-            let byte = self.next_byte();
+            let byte = self.buffer[self.byte_position];
 
             // Need to get the rightmost bits
             let mask = 0b1111_1111 >> (8 - bits_left_in_byte);
@@ -104,7 +104,7 @@ impl BitBuffer {
             self.byte_position += 1;
 
             // Get the next byte
-            let mut byte = self.next_byte();
+            let mut byte = self.buffer[self.byte_position];
 
             // Get the leftmost how many bits?
             byte >>= 8 - num_bits_in_next_byte;
@@ -114,7 +114,7 @@ impl BitBuffer {
             self.bit_position += num_bits_in_next_byte;
         } else {
             // All my bits are here
-            let mut byte = self.next_byte();
+            let mut byte = self.buffer[self.byte_position];
 
             // Example - self.bit_position = 1
             //           bits = 5
@@ -180,14 +180,22 @@ impl BitBuffer {
         let vals_buf = self.read_n_bits(bits)?;
         if let Some(vals_buf) = vals_buf {
             let mut small_buf: [u8; 8] = [0; 8];
-            small_buf.clone_from_slice(&vals_buf[(BYTE_ARRAY_SIZE - 8)..]);
+
+            let offset = 8 - vals_buf.len();
+
+            for (i, j) in (offset..8).map(|i| (i, i - offset)) {
+                small_buf[i] |= vals_buf[j];
+            }
+
             let val = u64::from_be_bytes(small_buf);
+
             debug_assert!(
                 val < (1u64 << bits),
                 "val too large: {} >= {}",
                 val,
                 1u64 << bits
             );
+
             Ok(Some(val))
         } else {
             Ok(None)

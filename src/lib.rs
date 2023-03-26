@@ -73,22 +73,35 @@ pub fn scan_to_bufr_start(mut f: impl Seek + Read) -> Result<(), Box<dyn Error>>
     }
 }
 
-fn read_1_octet_u8(mut f: impl Read) -> Result<u8, Box<dyn Error>> {
+fn read_1_octet_u8(mut f: impl Read) -> Result<Option<u8>, Box<dyn Error>> {
     let mut value: [u8; 1] = [0; 1];
     f.read_exact(&mut value)?;
 
-    Ok(value[0])
-}
-
-fn read_2_octet_u16(mut f: impl Read) -> Result<u16, Box<dyn Error>> {
-    let mut value: [u8; 2] = [0; 2];
-    f.read_exact(&mut value)?;
-    let value = u16::from_be_bytes(value);
+    let value = match value[0] {
+        255 => None,
+        x => Some(x),
+    };
 
     Ok(value)
 }
 
-fn read_3_octet_usize(mut f: impl Read) -> Result<usize, Box<dyn Error>> {
+fn read_2_octet_u16(mut f: impl Read) -> Result<Option<u16>, Box<dyn Error>> {
+    const MISSING: u16 = !0;
+
+    let mut value: [u8; 2] = [0; 2];
+    f.read_exact(&mut value)?;
+    let value = u16::from_be_bytes(value);
+    let value = match value {
+        MISSING => None,
+        x => Some(x),
+    };
+
+    Ok(value)
+}
+
+fn read_3_octet_usize(mut f: impl Read) -> Result<Option<usize>, Box<dyn Error>> {
+    const MISSING: u64 = 0o0_0_0_0_0_7_7_7;
+
     let mut message_size: [u8; 3] = [0; 3];
     f.read_exact(&mut message_size)?;
     let message_size: [u8; 8] = [
@@ -102,7 +115,10 @@ fn read_3_octet_usize(mut f: impl Read) -> Result<usize, Box<dyn Error>> {
         message_size[2],
     ];
     let message_size: u64 = u64::from_be_bytes(message_size);
-    let message_size: usize = usize::try_from(message_size)?;
+    let message_size = match message_size {
+        MISSING => None,
+        x => Some(usize::try_from(x)?),
+    };
 
     Ok(message_size)
 }

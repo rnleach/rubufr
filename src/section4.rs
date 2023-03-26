@@ -133,11 +133,13 @@ pub(super) fn read_section_4(
 ) -> Result<(), Box<dyn Error>> {
     let mut octets_read: usize = 0;
 
-    let section_size = read_3_octet_usize(&mut f)?;
+    // TODO: If this shows up as missing, return an error.
+    let section_size = read_3_octet_usize(&mut f)?.unwrap();
     octets_read += 3;
 
+    // TODO: If this shows up as missing, return an error.
     // TODO: Check if this is zero and return an error if it isn't
-    let reserved = read_1_octet_u8(&mut f)?;
+    let reserved = read_1_octet_u8(&mut f)?.unwrap();
     octets_read += 1;
     debug_assert_eq!(reserved, 0, "Section 4: Octet 4 must be zero.");
 

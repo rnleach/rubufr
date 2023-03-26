@@ -15,7 +15,7 @@ impl BufrMessageBuilder {
                 update_num: !0,
                 data_category: !0,
                 data_subcategory: !0,
-                local_data_subcategory: !0,
+                local_data_subcategory: None,
                 bufr_master_table_version: !0,
                 local_tables_version: !0,
                 year: !0,
@@ -72,7 +72,7 @@ impl BufrMessageBuilder {
         self
     }
 
-    pub fn local_data_subcategory(&mut self, local_data_subcategory: u8) -> &mut Self {
+    pub fn local_data_subcategory(&mut self, local_data_subcategory: Option<u8>) -> &mut Self {
         self.bm.local_data_subcategory = local_data_subcategory;
         self
     }
@@ -178,7 +178,7 @@ pub struct BufrMessage {
     update_num: u8,
     data_category: u8,
     data_subcategory: u8,
-    local_data_subcategory: u8,
+    local_data_subcategory: Option<u8>,
     bufr_master_table_version: u8,
     local_tables_version: u8,
     year: u16,
@@ -238,13 +238,13 @@ impl Display for BufrMessage {
         writeln!(f)?;
         writeln!(f, "            Data Category: {}", self.data_category)?;
         writeln!(f, "         Data Subcategory: {}", self.data_subcategory)?;
-        writeln!(f, "   Local Data Subcategory: {}", self.local_data_subcategory)?;
+        writeln!(f, "   Local Data Subcategory: {:?}", self.local_data_subcategory)?;
         writeln!(f)?;
         writeln!(f, "       Originating Center: {}", self.originating_center)?;
         writeln!(f, "    Originating Subcenter: {}", self.originating_subcenter)?;
         writeln!(f, "            Update Number: {}", self.update_num)?;
         writeln!(f)?;
-        writeln!(f, "       Extra Sect. 1 Data: {}", self.section_1_extra_data_present())?;
+        writeln!(f, "     Extra Section 1 Data: {}", self.section_1_extra_data_present())?;
         writeln!(f, "        Section 2 Present: {}", self.section_2_present())?;
         writeln!(f)?;
         writeln!(f, "                     Year: {}", self.year)?;

@@ -13,7 +13,8 @@ pub(super) fn read_section_0(
     let _message_size = read_3_octet_usize(&mut f)?;
     let bufr_version = read_1_octet_u8(&mut f)?;
 
-    builder.bufr_version(bufr_version);
+    // TODO return error if version is None
+    builder.bufr_version(bufr_version.unwrap());
 
     Ok(())
 }
