@@ -339,10 +339,6 @@ fn print_structure_data(
     structure: &Structure,
     level: u32,
 ) -> Result<(), std::fmt::Error> {
-    if level == 0 {
-        writeln!(f)?;
-    }
-
     for _ in 0..(4 * level) {
         write!(f, " ")?;
     }
@@ -361,7 +357,17 @@ fn print_structure_data(
         }
         Structure::Replication(r) => {
             writeln!(f, r#"Replication ({})"#, r.items.len())?;
-            for item in &r.items {
+            let mut iter = r.items.iter();
+            for item in iter.by_ref().take(2) {
+                print_structure_data(f, item, level + 1)?;
+            }
+            if let Some(item) = iter.last() {
+                for _ in 0..6 {
+                    for _ in 0..(4 * level) {
+                        write!(f, " ")?;
+                    }
+                    writeln!(f, ".")?;
+                }
                 print_structure_data(f, item, level + 1)?;
             }
         }
@@ -371,10 +377,6 @@ fn print_structure_data(
                 print_structure_data(f, item, level + 1)?;
             }
         }
-    }
-
-    if level == 0 {
-        writeln!(f)?;
     }
 
     Ok(())
