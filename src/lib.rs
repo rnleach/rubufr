@@ -16,6 +16,8 @@ mod types;
 pub use types::BufrMessage;
 
 pub const MAX_BUFR_TABLE_VERSION_SUPPORTED: u8 = 39;
+pub const MAX_BUFR_EDITION_SUPPORTED: u8 = 4;
+pub const MIN_BUFR_EDITION_SUPPORTED: u8 = 4;
 
 pub fn read_bufr_message(mut f: impl Read) -> Result<BufrMessage, Box<dyn Error>> {
     let mut builder = types::BufrMessageBuilder::new();

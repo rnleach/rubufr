@@ -156,6 +156,15 @@ impl BufrMessageBuilder {
             panic!("data encoded with tables newer than supported in this version");
         }
 
+        if self.bm.bufr_version > crate::MAX_BUFR_EDITION_SUPPORTED
+            || self.bm.bufr_version < crate::MIN_BUFR_EDITION_SUPPORTED
+        {
+            panic!(
+                "data encoded with BUFR version {}, which is unsupported.",
+                self.bm.bufr_version
+            );
+        }
+
         self.bm
     }
 }
