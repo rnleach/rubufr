@@ -1,58 +1,5 @@
 use crate::{read_1_octet_u8, read_2_octet_u16, read_3_octet_usize, types::BufrMessageBuilder};
-use std::{error::Error, fmt::Display, io::Read};
-
-pub struct Section1 {
-    section_size: usize,
-    master_table: u8,
-    originating_center: u16,
-    originating_subcenter: u16,
-    update_num: u8,
-    section_2_present: bool,
-    data_category: u8,
-    data_subcategory: u8,
-    local_data_subcategory: u8,
-    bufr_master_table_version: u8,
-    local_tables_version: u8,
-    year: u16,
-    month: u8,
-    day: u8,
-    hour: u8,
-    minute: u8,
-    second: u8,
-    extra_data: Vec<u8>,
-}
-
-impl Display for Section1 {
-    #[rustfmt::skip]
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        writeln!(f, "           Section Length: {}", self.section_size)?;
-        writeln!(f, "        Master Table Code: {}", self.master_table)?;
-        writeln!(f, "       Originating Center: {}", self.originating_center)?;
-        writeln!(f, "    Originating Subcenter: {}", self.originating_subcenter)?;
-        writeln!(f, "            Update Number: {}", self.update_num)?;
-        writeln!(f, "        Section 2 Present: {}", self.section_2_present)?;
-        writeln!(f, "            Data Category: {}", self.data_category)?;
-        writeln!(f, "         Data Subcategory: {}", self.data_subcategory)?;
-        writeln!(f, "   Local Data Subcategory: {}", self.local_data_subcategory)?;
-        writeln!(f, "BUFR Master Table Version: {}", self.bufr_master_table_version)?;
-        writeln!(f, "     Local Tables Version: {}", self.local_tables_version)?;
-        writeln!(f, "                     Year: {}", self.year)?;
-        writeln!(f, "                    Month: {}", self.month)?;
-        writeln!(f, "                      Day: {}", self.day)?;
-        writeln!(f, "                     Hour: {}", self.hour)?;
-        writeln!(f, "                   Minute: {}", self.minute)?;
-        writeln!(f, "                   Second: {}", self.second)?;
-
-        let extra_data = !self.extra_data.is_empty();
-        writeln!(f, "               Extra Data: {}", extra_data)?;
-
-        if extra_data {
-            writeln!(f, "     Amount Of Extra Data: {}", self.extra_data.len())?;
-        }
-
-        Ok(())
-    }
-}
+use std::{error::Error, io::Read};
 
 #[rustfmt::skip]
 pub(super) fn read_section_1(mut f: impl Read, builder: &mut BufrMessageBuilder) -> Result<bool, Box<dyn Error>> {

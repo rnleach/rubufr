@@ -1,19 +1,5 @@
 use crate::{read_1_octet_u8, read_3_octet_usize, types::BufrMessageBuilder};
-use std::{error::Error, fmt::Display, io::Read};
-
-pub struct Section0 {
-    message_size: usize,
-    pub(crate) bufr_version: u8,
-}
-
-impl Display for Section0 {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        writeln!(f, "  BUFR version: {}", self.bufr_version)?;
-        writeln!(f, "Message Length: {}", self.message_size)?;
-
-        Ok(())
-    }
-}
+use std::{error::Error, io::Read};
 
 pub(super) fn read_section_0(
     mut f: impl Read,
@@ -26,8 +12,6 @@ pub(super) fn read_section_0(
 
     let _message_size = read_3_octet_usize(&mut f)?;
     let bufr_version = read_1_octet_u8(&mut f)?;
-
-    // TODO: create error and return it if BUFR version not 4
 
     builder.bufr_version(bufr_version);
 

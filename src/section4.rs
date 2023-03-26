@@ -5,20 +5,7 @@ use crate::{
     tables::{table_b, table_d},
     types::{BufrMessageBuilder, Element, Group, Replication, Structure, Value},
 };
-use std::{error::Error, fmt::Display, io::Read};
-
-pub struct Section4 {
-    section_size: usize,
-}
-
-impl Display for Section4 {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        writeln!(f, "Section Size: {}", self.section_size)?;
-        writeln!(f)?;
-
-        Ok(())
-    }
-}
+use std::{error::Error, io::Read};
 
 fn read_element_descriptor(
     f: &mut BitBuffer,

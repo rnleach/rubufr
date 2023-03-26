@@ -1,31 +1,6 @@
 use crate::{read_1_octet_u8, read_2_octet_u16, read_3_octet_usize, types::BufrMessageBuilder};
 use std::{error::Error, fmt::Display, io::Read};
 
-pub struct Section3 {
-    section_size: usize,
-    num_datasets: u16,
-    observed_data: bool,
-    compressed_data: bool,
-    descriptors: Vec<Descriptor>,
-}
-
-impl Display for Section3 {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        writeln!(f, "        Section Size: {}", self.section_size)?;
-        writeln!(f, "  Number of Datasets: {}", self.num_datasets)?;
-        writeln!(f, "       Observed Data: {}", self.observed_data)?;
-        writeln!(f, "     Compressed Data: {}", self.compressed_data)?;
-
-        writeln!(f, "         Descriptors:")?;
-        for desc in &self.descriptors {
-            write!(f, "{}", desc)?;
-        }
-        writeln!(f)?;
-
-        Ok(())
-    }
-}
-
 #[derive(Clone, Copy, Debug, Hash)]
 pub struct Descriptor {
     f: u8,
