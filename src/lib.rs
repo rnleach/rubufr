@@ -1,42 +1,19 @@
 use std::{
     error::Error,
-    fmt::Display,
     io::{Read, Seek},
 };
 
-mod section0;
-use section0::Section0;
-
-mod section1;
-use section1::Section1;
-
-mod section2;
-use section2::Section2;
-
-mod section3;
-use section3::Section3;
-
-mod section4;
-use section4::Section4;
-
-mod section5;
-use section5::Section5;
-
 mod bit_buffer;
-
+mod section0;
+mod section1;
+mod section2;
+mod section3;
+mod section4;
+mod section5;
 mod tables;
-
 mod types;
-pub use types::BufrMessage;
 
-pub struct BufrMessageSections {
-    section_0: Section0,
-    section_1: Section1,
-    section_2: Section2,
-    section_3: Section3,
-    section_4: Section4,
-    section_5: Section5,
-}
+pub use types::BufrMessage;
 
 pub fn read_bufr_message(mut f: impl Read) -> Result<BufrMessage, Box<dyn Error>> {
     let mut builder = types::BufrMessageBuilder::new();
@@ -89,30 +66,6 @@ pub fn scan_to_bufr_start(mut f: impl Seek + Read) -> Result<(), Box<dyn Error>>
             }
             position += 1;
         }
-    }
-}
-
-impl Display for BufrMessageSections {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        writeln!(f, "Section 0:")?;
-        writeln!(f, "{}", self.section_0)?;
-
-        writeln!(f, "Section 1:")?;
-        writeln!(f, "{}", self.section_1)?;
-
-        writeln!(f, "Section 2:")?;
-        writeln!(f, "{}", self.section_2)?;
-
-        writeln!(f, "Section 3:")?;
-        writeln!(f, "{}", self.section_3)?;
-
-        writeln!(f, "Section 4:")?;
-        writeln!(f, "{}", self.section_4)?;
-
-        writeln!(f, "Section 5:")?;
-        writeln!(f, "{}", self.section_5)?;
-
-        Ok(())
     }
 }
 
