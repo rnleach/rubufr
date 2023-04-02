@@ -104,7 +104,7 @@ impl Display for BufrMessage {
         writeln!(f)?;
 
         for structure in self.elements.iter() {
-            structure::print_structure_data(f, structure, 0)?;
+            structure::print_structure_data(f, structure, &mut vec![])?;
         }
 
         Ok(())

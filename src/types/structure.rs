@@ -71,15 +71,34 @@ pub(crate) enum Structure {
     Replication(Replication),
 }
 
+impl Structure {
+    pub(crate) fn path(&self) -> &'static str {
+        match self {
+            Self::Element(e) => e.fxy,
+            Self::Replication(_) => "repeat",
+            Self::Group(g) => g.fxy,
+        }
+    }
+}
+
+macro_rules! print_indent {
+    ($f: ident, $level:expr) => {
+        for _ in 0..(4 * $level) {
+            write!($f, " ")?;
+        }
+    };
+}
+
 pub(super) fn print_structure_data(
     f: &mut std::fmt::Formatter,
     structure: &Structure,
-    level: u32,
+    mut fxys: &mut Vec<&'static str>,
 ) -> Result<(), std::fmt::Error> {
-    for _ in 0..(4 * level) {
-        write!(f, " ")?;
-    }
+    let level = fxys.len();
 
+    fxys.push(structure.path());
+
+    print_indent!(f, level);
     match structure {
         Structure::Element(e) => {
             write!(f, r#"Element: "{:6}" | Value: "#, e.fxy)?;
@@ -90,31 +109,37 @@ pub(super) fn print_structure_data(
                 Value::Numeric(n) => write!(f, "{:12}", n)?,
                 Value::Str(s) => write!(f, r#"{:12}"#, s)?,
             }
-            writeln!(f, r#" | Units: {:12} | Name: "{}""#, e.units, e.name)?;
+            write!(f, r#" | Units: {:12} | Name: "{}" | "#, e.units, e.name)?;
+
+            // Print the query path.
+            write!(f, "\"")?;
+            for fxy in fxys.iter() {
+                write!(f, "/{}", fxy)?;
+            }
+            writeln!(f, "\"")?;
         }
         Structure::Replication(r) => {
             writeln!(f, r#"Replication ({})"#, r.items.len())?;
             let mut iter = r.items.iter();
             for item in iter.by_ref().take(2) {
-                print_structure_data(f, item, level + 1)?;
+                print_structure_data(f, item, &mut fxys)?;
             }
             if let Some(item) = iter.last() {
                 for _ in 0..6 {
-                    for _ in 0..(4 * level) {
-                        write!(f, " ")?;
-                    }
+                    print_indent!(f, level + 1);
                     writeln!(f, ".")?;
                 }
-                print_structure_data(f, item, level + 1)?;
+                print_structure_data(f, item, &mut fxys)?;
             }
         }
         Structure::Group(g) => {
             writeln!(f, r#"Group: "{:6}" | "{}""#, g.fxy, g.name)?;
             for item in &g.items {
-                print_structure_data(f, item, level + 1)?;
+                print_structure_data(f, item, &mut fxys)?;
             }
         }
     }
 
+    fxys.pop();
     Ok(())
 }
