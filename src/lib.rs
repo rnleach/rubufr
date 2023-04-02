@@ -36,8 +36,9 @@ pub fn read_bufr_message(mut f: impl Read) -> Result<BufrMessage, Box<dyn Error>
     Ok(builder.build())
 }
 
-pub fn scan_to_bufr_start(mut f: impl Seek + Read) -> Result<(), Box<dyn Error>> {
-    let mut position: usize = 0;
+pub fn scan_to_bufr_start(mut f: impl Seek + Read) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut header: Vec<u8> = vec![];
+    let mut position: u64 = f.stream_position()?;
 
     let mut buffer: [u8; 24] = [0; 24];
     loop {
@@ -46,7 +47,7 @@ pub fn scan_to_bufr_start(mut f: impl Seek + Read) -> Result<(), Box<dyn Error>>
         if num_read == 0 {
             return Err(Box::new(std::io::Error::new(
                 std::io::ErrorKind::Other,
-                "Not a bufr file",
+                "No more bufr messages in file.",
             )));
         }
 
@@ -56,19 +57,21 @@ pub fn scan_to_bufr_start(mut f: impl Seek + Read) -> Result<(), Box<dyn Error>>
             && buffer[2] == 'F' as u8
             && buffer[3] == 'R' as u8
         {
-            f.seek(std::io::SeekFrom::Start(position as u64))?;
-            return Ok(());
+            f.seek(std::io::SeekFrom::Start(position))?;
+            return Ok(header);
         } else if buffer[0] == 'B' as u8 {
             scan_start = 1;
             position += 1;
+            header.push(buffer[0]);
         }
 
         for i in scan_start..num_read {
             if buffer[i] == 'B' as u8 {
-                f.seek(std::io::SeekFrom::Start(position as u64))?;
+                f.seek(std::io::SeekFrom::Start(position))?;
                 break;
             }
             position += 1;
+            header.push(buffer[i]);
         }
     }
 }
