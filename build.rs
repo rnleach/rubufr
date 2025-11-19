@@ -20,7 +20,7 @@ fn make_table_b() -> Result<(), Box<dyn Error>> {
     let mut table_b = HashMap::new();
 
     let mut reader = Reader::from_reader(BufReader::new(File::open(TABLE_B_INPUT)?));
-    reader.trim_text(true);
+    reader.config_mut().trim_text(true);
 
     let mut buf = Vec::new();
     let mut txt = String::new();
@@ -82,7 +82,7 @@ fn make_table_b() -> Result<(), Box<dyn Error>> {
                 }
                 _ => {}
             },
-            Event::Text(e) => txt.push_str(&e.unescape().unwrap()),
+            Event::Text(e) => txt.push_str(&e.decode().unwrap()),
 
             // There are several other `Event`s we do not consider here
             _ => {}
@@ -107,10 +107,7 @@ fn make_table_b() -> Result<(), Box<dyn Error>> {
     writeln!(w, "pub const MAX_BIT_WIDTH: usize = {};", max_width_bits)?;
     writeln!(w)?;
     writeln!(w, "lazy_static! {{")?;
-    writeln!(
-        w,
-        "    pub static ref TABLE_B: HashMap<&'static str, TableBEntry> = ["
-    )?;
+    writeln!(w, "    pub static ref TABLE_B: HashMap<&'static str, TableBEntry> = [")?;
 
     for (key, value) in table_b.into_iter() {
         writeln!(
@@ -134,7 +131,7 @@ fn make_table_d() -> Result<(), Box<dyn Error>> {
     let mut table_d = HashMap::new();
 
     let mut reader = Reader::from_reader(BufReader::new(File::open(TABLE_D_INPUT)?));
-    reader.trim_text(true);
+    reader.config_mut().trim_text(true);
 
     let mut buf = Vec::new();
     let mut txt = String::new();
@@ -176,7 +173,7 @@ fn make_table_d() -> Result<(), Box<dyn Error>> {
                 }
                 _ => {}
             },
-            Event::Text(e) => txt.push_str(&e.unescape().unwrap()),
+            Event::Text(e) => txt.push_str(&e.decode().unwrap()),
 
             // There are several other `Event`s we do not consider here
             _ => {}
