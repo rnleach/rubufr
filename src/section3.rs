@@ -13,10 +13,10 @@ impl Display for Descriptor {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
 
         match self.f {
-            0 => writeln!(f, "Element Descriptor (Table B): Class = {} Entry = {}", self.x, self.y)?,
-            1 => writeln!(f, "Replication Descriptor: Operator = {} Number = {}", self.x, self.y)?,
+            0 => writeln!(f, "Element Descriptor (Table B): Class = {} Entry = {}",  self.x, self.y)?,
+            1 => writeln!(f, "Replication Descriptor: Operator = {} Number = {}",    self.x, self.y)?,
             2 => writeln!(f, "Operator Descriptor (Table C): Operation = {} Y = {}", self.x, self.y)?,
-            3 => writeln!(f, "Sequence Descriptor (Table D): X = {} Y = {}", self.x, self.y)?,
+            3 => writeln!(f, "Sequence Descriptor (Table D): X = {} Y = {}",         self.x, self.y)?,
             x => panic!("NOT A VALID DESCRIPTOR TYPE {}", x),
         }
 
@@ -34,6 +34,7 @@ impl Descriptor {
         let xs = &s[1..3];
         let ys = &s[3..];
 
+        // TODO: Do error returns instead of unwrap.
         let f = u8::from_str_radix(fs, 10).unwrap();
         let x = u8::from_str_radix(xs, 10).unwrap();
         let y = u8::from_str_radix(ys, 10).unwrap();
@@ -42,6 +43,7 @@ impl Descriptor {
     }
 
     pub fn decode_binary_descriptor(desc: u16) -> Self {
+        // TODO: Error checking for valid values of f, x, y
         let fx: u8 = (desc >> 8) as u8;
         let f = (fx & 0b1100_0000u8) >> 6;
         let x = fx & 0b0011_1111u8;

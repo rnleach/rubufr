@@ -8,6 +8,8 @@ pub(super) fn read_section_0(
     let mut bufr_name: [u8; 4] = [0; 4];
     f.read_exact(&mut bufr_name)?;
     let bufr_name = std::str::from_utf8(&bufr_name)?;
+
+    // TODO: Return error if not BUFR
     assert_eq!(bufr_name, "BUFR");
 
     let _message_size = read_3_octet_usize(&mut f)?;

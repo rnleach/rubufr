@@ -52,11 +52,7 @@ pub fn scan_to_bufr_start(mut f: impl Seek + Read) -> Result<Vec<u8>, Box<dyn Er
         }
 
         let mut scan_start = 0;
-        if buffer[0] == 'B' as u8
-            && buffer[1] == 'U' as u8
-            && buffer[2] == 'F' as u8
-            && buffer[3] == 'R' as u8
-        {
+        if buffer[0] == 'B' as u8 && buffer[1] == 'U' as u8 && buffer[2] == 'F' as u8 && buffer[3] == 'R' as u8 {
             f.seek(std::io::SeekFrom::Start(position))?;
             return Ok(header);
         } else if buffer[0] == 'B' as u8 {

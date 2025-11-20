@@ -64,7 +64,7 @@ impl BitBuffer {
             self.byte_buffer[i] = mask[i] & self.read_u8(8)?;
         }
 
-        // Check for BUFR missing value (all bits are set to 1
+        // Check for BUFR missing value (all bits are set to 1)
         if self.byte_buffer == mask {
             Ok(None)
         } else {
