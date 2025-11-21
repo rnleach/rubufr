@@ -4,7 +4,7 @@ pub(crate) mod message_builder;
 pub(crate) use message_builder::BufrMessageBuilder;
 
 pub(crate) mod structure;
-pub(crate) use structure::{Element, Group, Replication, Structure, Value};
+pub use structure::{Element, Group, Replication, Structure, Value};
 
 #[derive(Debug)]
 pub struct BufrMessage {
@@ -52,6 +52,11 @@ impl BufrMessage {
      */
     pub fn section_1_extra_data_present(&self) -> bool {
         !self.extra_section_1_data.is_empty()
+    }
+
+    /** Get the elements vector, or a vector of structures. */
+    pub fn get_elements(&self) -> &[Structure] {
+        &self.elements
     }
 
     fn master_table_str(&self) -> &'static str {

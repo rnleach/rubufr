@@ -1,5 +1,5 @@
 #[derive(Debug)]
-pub(crate) enum Value {
+pub enum Value {
     Missing,
     Float(f64),
     Code(u64),
@@ -8,7 +8,7 @@ pub(crate) enum Value {
 }
 
 #[derive(Debug)]
-pub(crate) struct Element {
+pub struct Element {
     val: Value,
     fxy: &'static str,
     units: &'static str,
@@ -24,10 +24,47 @@ impl Element {
             fxy,
         }
     }
+
+    pub fn get_str_val(&self) -> Option<&str> {
+        if let Value::Str(ref str_val) = self.val {
+            Some(str_val)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_i32_val(&self) -> Option<i32> {
+        if let Value::Numeric(num) = self.val {
+            i32::try_from(num).ok()
+        } else {
+            None
+        }
+    }
+
+    pub fn get_u32_val(&self) -> Option<u32> {
+        if let Value::Numeric(num) = self.val {
+            u32::try_from(num).ok()
+        } else {
+            None
+        }
+    }
+
+    pub fn get_f64_val(&self) -> Option<f64> {
+        if let Value::Float(num) = self.val {
+            Some(num)
+        } else {
+            None
+        }
+    }
+
+    pub fn code(&self) -> &'static str {
+        self.fxy
+    }
+
 }
 
 #[derive(Debug)]
-pub(crate) struct Group {
+pub struct Group {
     items: Vec<Structure>,
     fxy: &'static str,
     name: &'static str,
@@ -45,10 +82,22 @@ impl Group {
     pub fn push(&mut self, structure: Structure) {
         self.items.push(structure);
     }
+
+    pub fn code(&self) -> &'static str {
+        self.fxy
+    }
+
+    pub fn name(&self) -> &'static str {
+        self.name
+    }
+
+    pub fn items(&self) -> &[Structure] {
+        &self.items
+    }
 }
 
 #[derive(Debug)]
-pub(crate) struct Replication {
+pub struct Replication {
     items: Vec<Structure>,
 }
 
@@ -62,10 +111,18 @@ impl Replication {
     pub fn push(&mut self, structure: Structure) {
         self.items.push(structure);
     }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn items(&self) -> &[Structure] {
+        &self.items
+    }
 }
 
 #[derive(Debug)]
-pub(crate) enum Structure {
+pub enum Structure {
     Element(Element),
     Group(Group),
     Replication(Replication),

@@ -17,15 +17,12 @@ fn read_element_descriptor(
 
     let value = match desc.units {
         "CCITT IA5" => Value::Str(f.read_text(bits)?),
-        "Numeric" => f
-            .read_i64(bits, desc.reference_val)?
-            .map(Value::Numeric)
-            .unwrap_or(Value::Missing),
-        "Code table" => f.read_u64(bits)?.map(Value::Code).unwrap_or(Value::Missing),
-        _ => f
-            .read_f64(bits, desc.reference_val, desc.scale_val)?
-            .map(Value::Float)
-            .unwrap_or(Value::Missing),
+
+        "Numeric" | "a" | "mon" | "d" | "h" | "min" | "s" => f.read_i64(bits, desc.reference_val)?.map(Value::Numeric).unwrap_or(Value::Missing),
+
+        "Code table" | "Flag table" => f.read_u64(bits)?.map(Value::Code).unwrap_or(Value::Missing),
+
+        _ => f.read_f64(bits, desc.reference_val, desc.scale_val)?.map(Value::Float).unwrap_or(Value::Missing),
     };
 
     Ok(Element::new(value, desc.units, name, desc.fxy))
@@ -36,12 +33,7 @@ fn read_replication_descriptor<'a>(
     desc: &Descriptor,
     iter: &mut dyn Iterator<Item = &'a Descriptor>,
 ) -> Result<Replication, Box<dyn Error>> {
-    debug_assert_eq!(
-        desc.f_value(),
-        1,
-        "Not a replication descriptor, f={}",
-        desc.f_value()
-    );
+    debug_assert_eq!(desc.f_value(), 1, "Not a replication descriptor, f={}", desc.f_value());
 
     let num_descriptors = desc.x_value();
 
