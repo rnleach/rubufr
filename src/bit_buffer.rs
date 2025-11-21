@@ -37,11 +37,7 @@ impl BitBuffer {
     }
 
     fn num_bytes_to_hold_bits(n: usize) -> usize {
-        if n % 8 == 0 {
-            n / 8
-        } else {
-            n / 8 + 1
-        }
+        if n % 8 == 0 { n / 8 } else { n / 8 + 1 }
     }
 
     fn read_n_bits(&mut self, n: usize) -> Result<Option<&[u8]>, Box<dyn Error>> {

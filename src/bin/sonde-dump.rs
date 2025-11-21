@@ -1,11 +1,11 @@
 use std::{env, error::Error, iter::zip};
 
 use chrono::NaiveDate;
-use optional::{none, Optioned};
+use optional::{Optioned, none};
 
-use sonde_bufr::{read_bufr_message, scan_to_bufr_start, Structure, Group, Replication};
+use sonde_bufr::{Group, Replication, Structure, read_bufr_message, scan_to_bufr_start};
 
-use metfor::{Kelvin, Celsius, HectoPascal, Meters, MetersPSec, Knots, WindSpdDir};
+use metfor::{Celsius, HectoPascal, Kelvin, Knots, Meters, MetersPSec, WindSpdDir};
 use sounding_analysis::{Sounding, StationInfo};
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -19,7 +19,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut f = std::io::BufReader::new(f);
 
     loop {
-
         if let Err(e) = scan_to_bufr_start(&mut f) {
             println!("End of file or error: {}", e);
             break;
@@ -52,7 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             "301111" => station = extract_station_id_from_group(grp, station),
                             "301113" => snd = extract_time_info_from_group(grp, snd),
                             "301114" => station = extract_station_location_from_group(grp, station),
-                            _ => {},
+                            _ => {}
                         }
                     } else if let Structure::Replication(rep) = structure {
                         if rep.len() > pres.capacity() {
@@ -83,7 +82,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         snd = snd.with_height_profile(hgt);
         snd = snd.with_wind_profile(wnd);
 
-
         println!();
         println!("---------- Sounding ---------- ");
         println!("     Source:  {:?}", snd.source_description());
@@ -102,23 +100,45 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("       surface wind:  {:?}", snd.sfc_wind());
         println!();
         for row in snd.top_down().take(10) {
-            println!("{:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?}",
-                row.pressure, row.temperature, row.wet_bulb, row.dew_point, row.theta_e, row.wind, row.pvv,
-                row.height, row.cloud_fraction);
+            println!(
+                "{:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?}",
+                row.pressure,
+                row.temperature,
+                row.wet_bulb,
+                row.dew_point,
+                row.theta_e,
+                row.wind,
+                row.pvv,
+                row.height,
+                row.cloud_fraction
+            );
         }
         println!("          :");
         println!("          :");
         println!("          :");
 
-        for row in snd.top_down().enumerate().skip_while(|(i, _)| *i < snd.pressure_profile().len() - 11).map(|(_, x)| x) {
-            println!("{:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?}",
-                row.pressure, row.temperature, row.wet_bulb, row.dew_point, row.theta_e, row.wind, row.pvv,
-                row.height, row.cloud_fraction);
+        for row in snd
+            .top_down()
+            .enumerate()
+            .skip_while(|(i, _)| *i < snd.pressure_profile().len() - 11)
+            .map(|(_, x)| x)
+        {
+            println!(
+                "{:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?}",
+                row.pressure,
+                row.temperature,
+                row.wet_bulb,
+                row.dew_point,
+                row.theta_e,
+                row.wind,
+                row.pvv,
+                row.height,
+                row.cloud_fraction
+            );
         }
         println!("------------------------------ ");
         println!();
         println!();
-
     }
 
     Ok(())
@@ -133,19 +153,28 @@ fn extract_data_rows(
     dir: &mut Vec<Optioned<f64>>,
     spd: &mut Vec<Optioned<Knots>>,
 ) {
-
     for structure in rep.items() {
-        if let Structure::Group(grp) = structure && grp.code() == "303054" {
+        if let Structure::Group(grp) = structure
+            && grp.code() == "303054"
+        {
             for structure in grp.items() {
                 if let Structure::Element(el) = structure {
                     match el.code() {
-                        "007004" => pres.push(el.get_f64_val().map(|x| x / 100.0).map(HectoPascal).into()),
+                        "007004" => {
+                            pres.push(el.get_f64_val().map(|x| x / 100.0).map(HectoPascal).into())
+                        }
                         "010009" => hgt.push(el.get_f64_val().map(Meters).into()),
                         "011001" => dir.push(el.get_f64_val().into()),
-                        "011002" => spd.push(el.get_f64_val().map(MetersPSec).map(Knots::from).into()),
-                        "012101" => temp.push(el.get_f64_val().map(Kelvin).map(Celsius::from).into()),
-                        "012103" => dewp.push(el.get_f64_val().map(Kelvin).map(Celsius::from).into()),
-                        _ => {},
+                        "011002" => {
+                            spd.push(el.get_f64_val().map(MetersPSec).map(Knots::from).into())
+                        }
+                        "012101" => {
+                            temp.push(el.get_f64_val().map(Kelvin).map(Celsius::from).into())
+                        }
+                        "012103" => {
+                            dewp.push(el.get_f64_val().map(Kelvin).map(Celsius::from).into())
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -179,19 +208,19 @@ fn extract_station_location_from_group(grp: &Group, mut station: StationInfo) ->
                 if elev.is_none() && el.get_f64_val().is_some() {
                     elev = el.get_f64_val().map(Meters).into();
                 }
-            },
+            }
 
             Structure::Group(grp) if grp.code() == "301021" => {
                 for structure in grp.items() {
                     match structure {
                         Structure::Element(el) if el.code() == "005001" => lat = el.get_f64_val(),
                         Structure::Element(el) if el.code() == "006001" => lon = el.get_f64_val(),
-                        _ => {},
+                        _ => {}
                     }
                 }
-            },
+            }
 
-            _ => {},
+            _ => {}
         }
     }
 
@@ -238,4 +267,3 @@ fn extract_time_info_from_group(grp: &Group, mut snd: Sounding) -> Sounding {
 
     snd
 }
-

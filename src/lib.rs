@@ -13,7 +13,7 @@ mod section5;
 mod tables;
 mod types;
 
-pub use types::{BufrMessage, Structure, Group, Replication, Element};
+pub use types::{BufrMessage, Element, Group, Replication, Structure};
 
 pub const MAX_BUFR_TABLE_VERSION_SUPPORTED: u8 = 39;
 pub const MAX_BUFR_EDITION_SUPPORTED: u8 = 4;

@@ -60,7 +60,6 @@ impl Element {
     pub fn code(&self) -> &'static str {
         self.fxy
     }
-
 }
 
 #[derive(Debug)]
