@@ -14,6 +14,11 @@ pub fn load_309052_sounding(path: &Path) -> Result<Sounding, Box<dyn Error>> {
     let f = std::fs::File::open(path)?;
     let mut f = std::io::BufReader::new(f);
 
+    let file_name = path
+        .file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_else(|| "Unknown file.".to_owned());
+
     scan_to_bufr_start(&mut f)?; 
     let bufr = read_bufr_message(&mut f)?;
 
@@ -67,6 +72,7 @@ pub fn load_309052_sounding(path: &Path) -> Result<Sounding, Box<dyn Error>> {
         .collect();
 
     snd = snd.with_station_info(station);
+    snd = snd.with_source_description(file_name);
     snd = snd.with_pressure_profile(pres);
     snd = snd.with_temperature_profile(temp);
     snd = snd.with_dew_point_profile(dewp);
