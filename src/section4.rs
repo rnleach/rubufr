@@ -11,7 +11,7 @@ fn read_element_descriptor(
     f: &mut BitBuffer,
     desc: &Descriptor,
 ) -> Result<Element, Box<dyn Error>> {
-    let desc = table_b::TABLE_B.get(&desc.string_form() as &str).unwrap();
+    let desc = table_b::TABLE_B.get(&desc.string_form() as &str).ok_or(std::io::Error::other("Invalid Table B Entry"))?;
     let bits = desc.width_bits;
     let name = desc.element_name;
 
@@ -46,7 +46,8 @@ fn read_replication_descriptor<'a>(
     let mut num_repititions: usize = desc.y_value() as usize;
 
     if num_repititions == 0 {
-        let reps = iter.next().unwrap();
+        let reps = iter.next()
+            .ok_or(std::io::Error::new(std::io::ErrorKind::InvalidData, "Incomplete Replcation Descriptor"))?;
         debug_assert_eq!(reps.f_value(), 0);
         debug_assert_eq!(reps.x_value(), 31);
         let bits = match reps.y_value() {
@@ -58,7 +59,8 @@ fn read_replication_descriptor<'a>(
             ),
         };
 
-        num_repititions = f.read_usize(bits)?.expect("Missing number of reps!?");
+        num_repititions = f.read_usize(bits)?
+            .ok_or(std::io::Error::new(std::io::ErrorKind::InvalidData, "Incomplete Replcation Descriptor"))?;
     }
 
     let mut descriptors = Vec::with_capacity(num_descriptors as usize);
@@ -94,16 +96,15 @@ fn read_sequence_descriptor<'a>(
     f: &mut BitBuffer,
     desc: &Descriptor,
 ) -> Result<Group, Box<dyn Error>> {
-    let entry = table_d::TABLE_D.get(&desc.string_form() as &str).unwrap();
-    let sequence: Vec<_> = entry
+    let entry = table_d::TABLE_D.get(&desc.string_form() as &str).ok_or(std::io::Error::other("Invalid Table D Entry"))?;
+    let sequence: Vec<Descriptor> = entry
         .elements
         .iter()
         .map(|d| Descriptor::from_string_form(d))
-        .collect();
-
-    let mut desc_iter = sequence.iter();
+        .collect::<Result<_,_>>()?;
 
     let mut group = Group::new_with_capacity(sequence.len(), entry.group_name, entry.fxy);
+    let mut desc_iter = sequence.iter();
 
     loop {
         let desc = match desc_iter.next() {
@@ -131,15 +132,19 @@ pub(super) fn read_section_4(
 ) -> Result<(), Box<dyn Error>> {
     let mut octets_read: usize = 0;
 
-    // TODO: If this shows up as missing, return an error.
-    let section_size = read_3_octet_usize(&mut f)?.unwrap();
+    let section_size = read_3_octet_usize(&mut f)?
+        .ok_or(std::io::Error::new(std::io::ErrorKind::InvalidData, "Section Size Required"))?;
     octets_read += 3;
 
-    // TODO: If this shows up as missing, return an error.
-    // TODO: Check if this is zero and return an error if it isn't
-    let reserved = read_1_octet_u8(&mut f)?.unwrap();
+    let _reserved: () = read_1_octet_u8(&mut f)?
+        .ok_or(std::io::Error::new(std::io::ErrorKind::InvalidData, "Reserved Octet Required"))
+        .and_then(|val| {
+            match val {
+                0 => Ok(()),
+                _ => Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Reserved Octet Required To Be 0")),
+            }
+        })?;
     octets_read += 1;
-    debug_assert_eq!(reserved, 0, "Section 4: Octet 4 must be zero.");
 
     assert!(!descriptors.is_empty());
 

@@ -165,7 +165,7 @@ pub(super) fn print_structure_data(
                 Value::Numeric(n) => write!(f, "{:12}", n)?,
                 Value::Str(s) => write!(f, r#"{:12}"#, s)?,
             }
-            write!(f, r#" | Units: {:12} | Name: "{}" | "#, e.units, e.name)?;
+            write!(f, r#" | Units: {:12} | Name: "{:40}" | "#, e.units, e.name)?;
 
             // Print the query path.
             write!(f, "\"")?;

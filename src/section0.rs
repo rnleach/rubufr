@@ -9,14 +9,15 @@ pub(super) fn read_section_0(
     f.read_exact(&mut bufr_name)?;
     let bufr_name = std::str::from_utf8(&bufr_name)?;
 
-    // TODO: Return error if not BUFR
-    assert_eq!(bufr_name, "BUFR");
+    if bufr_name != "BUFR" {
+        return Err(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid BUFR Magic Value")));
+    }
 
     let _message_size = read_3_octet_usize(&mut f)?;
-    let bufr_version = read_1_octet_u8(&mut f)?;
+    let bufr_version = read_1_octet_u8(&mut f)?
+        .ok_or(std::io::Error::new(std::io::ErrorKind::InvalidData, "BUFR Version Missing"))?;
 
-    // TODO return error if version is None
-    builder.bufr_version(bufr_version.unwrap());
+    builder.bufr_version(bufr_version);
 
     Ok(())
 }
