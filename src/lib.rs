@@ -12,8 +12,11 @@ mod section4;
 mod section5;
 mod tables;
 mod types;
+mod easy_api;
 
-pub use types::{BufrMessage, Element, Group, Replication, Structure};
+pub use easy_api::load_309052_sounding;
+
+use crate::types::BufrMessage;
 
 pub const MAX_BUFR_TABLE_VERSION_SUPPORTED: u8 = 39;
 pub const MAX_BUFR_EDITION_SUPPORTED: u8 = 4;
